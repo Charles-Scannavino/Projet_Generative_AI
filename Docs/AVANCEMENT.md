@@ -33,6 +33,8 @@
 - [x] Python retenu comme langage principal.
 - [x] Google Colab retenu pour le prototypage.
 - [x] Google Drive utilisé pour la persistance des données importantes.
+- [x] Dépôt GitHub de référence connecté : `Charles-Scannavino/Projet_Generative_AI`.
+- [x] Arborescence GitHub structurée en `Docs/`, `notebooks/`, `eval/`, `data/`, `src/` et `app/`.
 - [x] Décision prise de modulariser ensuite le notebook en fichiers `.py`.
 - [ ] Préparer l'environnement local final avec `uv`.
 - [ ] Vérifier l'exécution locale du projet sur laptop.
@@ -85,10 +87,12 @@
 
 ### Golden set
 
-- [x] Création d'un **brouillon initial de 5 questions** dans `eval/golden_draft.jsonl`.
-- [ ] Remplacer progressivement les réponses vides et `gold_docs=[]` par des valeurs vérifiées sur les sources réelles.
-- [ ] Étendre rapidement à 15–20 questions réellement ancrées dans les documents disponibles.
-- [ ] Étendre progressivement vers environ 40 questions.
+- [x] Brouillon initial de 5 questions créé.
+- [x] Golden set actif enrichi à **20 questions** dans `eval/golden.jsonl`.
+- [x] Répartition actuelle : **18 RAG**, **1 hors périmètre**, **1 prompt injection**.
+- [x] Les questions RAG sont ancrées sur des identifiants Service-Public réels.
+- [x] Les cas d'éligibilité, RPLS et DVF non encore vérifiables sont conservés dans `eval/golden_backlog_pending.jsonl`.
+- [ ] Étendre progressivement vers environ 40 questions après intégration de LEGI, des plafonds, de RPLS et de DVF.
 - [ ] Couvrir :
   - factuel RAG ;
   - éligibilité ;
@@ -176,10 +180,10 @@
 
 - [ ] Créer une interface simple Streamlit si le temps le permet.
 - [ ] Afficher réponse, sources et trace de l'agent.
-- [ ] Rédiger le README final.
-- [ ] Documenter les versions exactes des modèles.
+- [x] README initial du dépôt rédigé et mis à jour avec l'architecture, l'état du projet et le workflow.
+- [ ] Documenter les versions exactes des modèles lorsque les choix seront figés.
 - [ ] Ajouter `.env.example`.
-- [ ] Vérifier `.gitignore`.
+- [x] `.gitignore` adapté au projet (Python/Colab, données extraites, index, résultats d'évaluation, secrets).
 - [ ] Vérifier qu'aucune clé API n'est présente.
 - [ ] Préparer la démonstration de secours enregistrée.
 - [ ] Créer le tag `v1.0` au gel du code.
@@ -280,6 +284,16 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 8 octobre 2026 — migration et structuration GitHub
+
+- Dépôt de référence : `Charles-Scannavino/Projet_Generative_AI`.
+- Fichiers réorganisés : documentation dans `Docs/`, notebook dans `notebooks/`, golden set dans `eval/`, corpus brut Service-Public dans `data/raw/service_public/`.
+- Création des répertoires de travail `src/`, `app/`, `data/processed/`, `data/indexes/` et des répertoires bruts futurs.
+- Golden set actif porté à **20 questions** ; backlog séparé pour éligibilité/RPLS/DVF.
+- README et `.gitignore` adaptés au projet.
+- GitHub devient la source de vérité pour le code, le notebook, la documentation et l'évaluation.
+
+
 ### 8 octobre 2026 — analyse de la dernière version du notebook
 
 - Notebook `Assistant_HLM_RAG (1).ipynb` analysé : **41 cellules**.
@@ -305,4 +319,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 8 octobre 2026 — analyse de `Assistant_HLM_RAG (1).ipynb`.*
+*Dernière mise à jour : 8 octobre 2026 — migration et structuration GitHub.*

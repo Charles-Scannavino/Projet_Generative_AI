@@ -1,0 +1,3 @@
+{"id": "future_eligibility_001", "type": "eligibility", "question": "Avec 28 000 euros de revenus pour un couple avec un enfant à Lyon, suis-je éligible à un logement social ?", "status": "pending_data", "reason": "À valider après intégration des plafonds PLAI/PLUS/PLS et des règles de zonage."}
+{"id": "future_rpls_001", "type": "rpls", "question": "Combien de logements sociaux vacants y a-t-il à Créteil ?", "status": "pending_data", "reason": "À valider après intégration du jeu de données RPLS avec année de référence."}
+{"id": "future_dvf_001", "type": "dvf", "question": "Quel est le prix médian au m² des ventes immobilières à Créteil pour une année donnée ?", "status": "pending_data", "reason": "À finaliser après intégration de DVF et choix de l'année de référence."}

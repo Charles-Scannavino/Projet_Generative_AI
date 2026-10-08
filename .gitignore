@@ -218,3 +218,65 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# =============================================================================
+# Projet Generative AI — Assistant HLM RAG
+# =============================================================================
+
+# Secrets / configuration locale
+.env
+.env.*
+!.env.example
+
+# macOS / OS
+.DS_Store
+Thumbs.db
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+content/
+
+# Données Service-Public extraites (le ZIP source peut rester versionné)
+data/raw/service_public/xml/
+data/raw/service_public/extracted/
+data/raw/service_public/**/*.xml
+
+# Données brutes futures potentiellement volumineuses
+data/raw/legi/*
+!data/raw/legi/.gitkeep
+data/raw/rpls/*
+!data/raw/rpls/.gitkeep
+data/raw/dvf/*
+!data/raw/dvf/.gitkeep
+data/raw/plafonds/*
+!data/raw/plafonds/.gitkeep
+
+# Index / embeddings / caches
+data/indexes/*
+!data/indexes/.gitkeep
+*.faiss
+*.index
+*.ann
+*.npy
+*.npz
+
+# Formats traités potentiellement volumineux
+data/processed/*.parquet
+data/processed/*.feather
+
+# Évaluation : sorties générées
+eval/out/
+eval/results.jsonl
+eval/results_*.jsonl
+
+# Modèles / caches Hugging Face / Ollama locaux
+.cache/
+huggingface/
+models/
+*.gguf
+
+# Logs
+logs/
+*.log
+

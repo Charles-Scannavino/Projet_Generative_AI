@@ -5,6 +5,8 @@
 ## 1. Informations générales
 
 - **Projet** : Assistant HLM — RAG et agent sur données ouvertes françaises.
+- **Dépôt GitHub de référence** : `Charles-Scannavino/Projet_Generative_AI`.
+- **Branche principale** : `main`.
 - **Cours** : Generative AI I — projet de groupe.
 - **Équipe** : 3 à 4 étudiants.
 - **Poids dans la note** : 50 % du cours.
@@ -196,6 +198,11 @@ Ablations attendues :
 - **Persistance** : Google Drive pour les fichiers importants.
 - Les fichiers temporaires volumineux ou les milliers de petits XML doivent être extraits dans `/content/` lorsque cela accélère fortement les traitements.
 
+### Versionnement et source de vérité
+- **GitHub est désormais la source de vérité** pour le code, le notebook, la documentation et les fichiers d'évaluation.
+- Google Drive / le stockage local restent utilisés pour les données de travail volumineuses et l'exécution Colab.
+- Avant toute modification importante, lire la version courante de `Docs/CONTEXT.md` et `Docs/AVANCEMENT.md` depuis le dépôt et vérifier l'état de la branche `main`.
+
 ### Finalisation
 Le notebook sert au prototypage, à l'exploration et aux expériences.
 
@@ -208,15 +215,21 @@ La version finale devra être modularisée en fichiers `.py`, afin de permettre 
 ## 8. Arborescence cible
 
 ```text
-assistant_hlm_rag/
+Projet_Generative_AI/
 ├── README.md
-├── pyproject.toml
-├── uv.lock
-├── .env.example
+├── pyproject.toml                  # à créer lors de la modularisation
+├── uv.lock                         # à créer avec uv
+├── .env.example                    # à créer avant la livraison
 ├── .gitignore
 ├── Docs/
 │   ├── CONTEXT.md
-│   └── AVANCEMENT.md
+│   ├── AVANCEMENT.md
+│   └── spec/
+│       ├── project-instructions.md
+│       ├── project-instructions.pdf
+│       └── Assistant HLM RAG et agent sur données ouvertes.docx
+├── notebooks/
+│   └── Assistant_HLM_RAG.ipynb
 ├── data/
 │   ├── raw/
 │   │   ├── service_public/
@@ -226,8 +239,6 @@ assistant_hlm_rag/
 │   │   └── plafonds/
 │   ├── processed/
 │   └── indexes/
-├── notebooks/
-│   └── Assistant_HLM_RAG.ipynb
 ├── src/
 │   ├── ingestion/
 │   ├── preprocessing/
@@ -236,13 +247,14 @@ assistant_hlm_rag/
 │   └── agent/
 ├── eval/
 │   ├── golden.jsonl
+│   ├── golden_backlog_pending.jsonl
 │   ├── run_eval.py
 │   └── metrics.py
 └── app/
     └── streamlit_app.py
 ```
 
-Cette arborescence est une cible. Elle peut être simplifiée si l'équipe préfère moins de fichiers, mais les responsabilités doivent rester séparées.
+Les dossiers de code encore vides sont conservés avec des fichiers `.gitkeep` jusqu'à leur implémentation.
 
 ## 9. État de référence actuel
 
@@ -253,8 +265,10 @@ Cette arborescence est une cible. Elle peut être simplifiée si l'équipe préf
 - l'extraction directe de milliers de XML vers Google Drive s'est révélée lente ;
 - la stratégie a été corrigée pour extraire les XML dans le stockage local Colab (`/content/`) ;
 - les métadonnées Service-Public ont été explorées ;
-- un premier filtre HLM strict retourne **24 fiches candidates** ;
-- il reste à définir le sous-corpus Service-Public final, suffisamment large et cohérent ;
+- le filtre HLM strict retourne **24 fiches candidates** ;
+- **350 fiches** dont le sujet contient `Logement` constituent le corpus Service-Public de travail ;
+- un filtre logement élargi retourne **505 fiches**, avec des faux positifs ;
+- le golden set actif contient désormais **20 questions** (18 RAG, 1 hors périmètre, 1 prompt injection) ;
 - LEGI, RPLS, DVF et les plafonds restent à intégrer ;
 - le chunking RAG au sens documentaire n'a pas encore été finalisé ;
 - BM25, dense retrieval, recherche hybride, reranker, agent et évaluation complète restent à construire.
@@ -296,4 +310,4 @@ Important : **ne pas confondre les numéros de cellules du notebook (« chunk 22
 
 ---
 
-*Dernière mise à jour : 8 octobre 2026 — adaptation complète au projet Assistant HLM RAG & Agent.*
+*Dernière mise à jour : 8 octobre 2026 — migration du projet vers GitHub et structuration du dépôt.*
