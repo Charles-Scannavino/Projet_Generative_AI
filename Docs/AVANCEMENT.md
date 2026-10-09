@@ -18,7 +18,9 @@
 - les 350 fiches ont été régénérées : 0 document vide, minimum 48 caractères / 8 mots, maximum 45 331 caractères / 7 498 mots, moyenne 9 872,5 caractères / 1 555,6 mots ;
 - l'audit des 10 documents les plus courts et longs a été réalisé ;
 - un échantillon reproductible de 20 documents (seed 42) a été lu et montre que le thème `Logement` est trop large pour l'assistant HLM : il contient aussi urbanisme, copropriété, piscines, taxe d'aménagement, forage, etc. ;
-- prochaine étape : définir et appliquer un périmètre Service-Public plus ciblé avant le chunking.
+- audit hiérarchique réalisé sur les 350 fiches : 107 `Bail d’habitation`, 63 `Urbanisme`, 47 `Copropriété`, 40 `Aides financières pour le logement`, 31 `Vie pratique dans un logement`, 28 `Achat immobilier`, 26 `Protection et sécurité de l'habitat`, 8 `Expropriation - Préemption` ;
+- dossiers particulièrement pertinents identifiés : `Accéder à un logement social` (8), `Aides personnelles au logement` (8), ainsi que plusieurs dossiers de bail d'habitation ;
+- prochaine étape : construire un corpus HLM ciblé avec règles explicites + inclusion forcée des `gold_docs`.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -262,12 +264,12 @@ L'échantillon de 20 documents montre que le simple filtre `dc:subject` contenan
 
 Ordre conseillé :
 
-1. enrichir les documents avec les métadonnées structurelles Service-Public (`SousThemePere`, `DossierPere`, fil d'Ariane) sans les injecter dans le texte ;
-2. définir des règles de périmètre explicites : cœur HLM/logement social + droits locatifs utiles, et exclusion des thèmes hors objectif ;
-3. produire un fichier d'audit avec chaque ID, titre, sous-thème, dossier, longueur et décision de conservation ;
-4. conserver les documents courts uniquement lorsqu'ils apportent une information substantielle ; exclure les stubs/redirections manifestes ;
+1. les métadonnées hiérarchiques Service-Public ont été auditées dans `data/processed/service_public_scope_audit.csv` ;
+2. définir et appliquer des règles explicites de sélection : cœur HLM/logement social + droits locatifs utiles, exclusion de l'urbanisme/copropriété/travaux hors périmètre ;
+3. produire un fichier d'audit avec décision `KEEP` / `EXCLUDE` et raison ;
+4. forcer l'inclusion de tous les `gold_docs` du golden set actif ;
 5. figer le corpus Service-Public retenu et documenter son nombre final ;
-6. vérifier les `gold_docs` du golden set dans ce corpus.
+6. vérifier que tous les `gold_docs` sont présents dans le corpus final.
 
 Ensuite :
 - intégrer LEGI pour compléter le corpus et tendre vers la cible d'environ 500 documents ;
@@ -289,6 +291,15 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 9 octobre 2026 — audit hiérarchique du périmètre Service-Public
+
+- `data/processed/service_public_scope_audit.csv` créé pour les **350** fiches.
+- Répartition par sous-thème : **107 Bail d’habitation**, **63 Urbanisme**, **47 Copropriété**, **40 Aides financières pour le logement**, **31 Vie pratique dans un logement**, **28 Achat immobilier**, **26 Protection et sécurité de l'habitat**, **8 Expropriation - Préemption**.
+- Dossiers HLM directement pertinents identifiés : **Accéder à un logement social (8)** et **Aides personnelles au logement (8)**.
+- Plusieurs dossiers de bail d'habitation sont également utiles pour les droits des locataires sociaux ; à l'inverse, urbanisme, copropriété, travaux, forage, piscines et sujets similaires sont hors cœur du projet.
+- Prochaine action : appliquer une règle de sélection explicite et vérifiable, tout en forçant la conservation des `gold_docs` du golden set.
+
 
 ### 9 octobre 2026 — parser corrigé, corpus audité et versionné
 
