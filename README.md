@@ -83,6 +83,31 @@ Dans Colab, les milliers de XML doivent être extraits de préférence dans `/co
 - DVF ;
 - plafonds PLAI / PLUS / PLS.
 
+## Emplacement local obligatoire
+
+Pour garantir le bon fonctionnement du notebook sans modification du chemin `PROJECT_PATH`, le dépôt doit être cloné ou déplacé dans l'emplacement suivant sur chaque ordinateur :
+
+```text
+~/Documents/Projets/Projet_Generative_AI
+```
+
+Le notebook utilise volontairement le chemin relatif au dossier personnel :
+
+```python
+PROJECT_PATH = "~/Documents/Projets/Projet_Generative_AI"
+```
+
+Tous les membres du groupe doivent donc conserver exactement cette arborescence locale. Le symbole `~` désigne le dossier personnel de l'utilisateur ; seul le nom d'utilisateur change d'un ordinateur à l'autre.
+
+Pour préparer l'emplacement avant le clonage :
+
+```bash
+mkdir -p ~/Documents/Projets
+cd ~/Documents/Projets
+git clone https://github.com/Charles-Scannavino/Projet_Generative_AI.git
+cd Projet_Generative_AI
+```
+
 ## Notebook
 
 Le notebook de prototypage est :
