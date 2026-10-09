@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** 🧹 Parser Service-Public opérationnel ; 350 fiches Logement extraites, avec nettoyage qualitatif à corriger avant de figer le corpus.
+**Statut actuel :** 🔎 Parser Service-Public corrigé et versionné ; 350 fiches Logement extraites, audit de pertinence du corpus en cours avant chunking.
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -14,8 +14,11 @@
 - 24 fiches correspondent au filtre HLM strict ;
 - un parser local `src/ingestion/service_public.py` a été créé et testé sur 5 fiches de référence ;
 - les 350 fiches contenant `Logement` dans `dc:subject` ont été extraites dans `data/processed/service_public_documents.jsonl` ;
-- aucun document n'est vide, mais le contrôle visuel révèle des redondances parent/enfant dans certains blocs (`ASavoir`, `Attention`, etc.) ;
-- certains documents sont anormalement courts (minimum observé : 48 caractères / 8 mots) et doivent être inspectés avant de figer le corpus.
+- la déduplication ciblée des conteneurs (`ASavoir`, `Attention`, `ANoter`, `Exemple`, `Definition`) a été validée sur les 5 fiches de référence sans perte du texte métier de `F21051` ;
+- les 350 fiches ont été régénérées : 0 document vide, minimum 48 caractères / 8 mots, maximum 45 331 caractères / 7 498 mots, moyenne 9 872,5 caractères / 1 555,6 mots ;
+- l'audit des 10 documents les plus courts et longs a été réalisé ;
+- un échantillon reproductible de 20 documents (seed 42) a été lu et montre que le thème `Logement` est trop large pour l'assistant HLM : il contient aussi urbanisme, copropriété, piscines, taxe d'aménagement, forage, etc. ;
+- prochaine étape : définir et appliquer un périmètre Service-Public plus ciblé avant le chunking.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -59,10 +62,10 @@
 - [x] Contrôle visuel initial : le filtre élargi contient des faux positifs hors cœur logement/HLM.
 - [x] Décision provisoire : utiliser les **350 fiches dont `subject` contient `Logement`** comme corpus Service-Public de travail.
 - [x] Métadonnées de ce corpus sauvegardées dans `data/processed/service_public_logement_metadata.csv`.
-- [ ] Inspecter plus finement les 350 titres / contenus pour exclure les fiches manifestement hors périmètre si nécessaire.
+- [x] Inspecter un échantillon reproductible de 20 documents ainsi que les extrêmes de longueur ; constat : le thème `Logement` contient de nombreuses fiches hors cœur HLM.
 - [x] Extraire le texte complet des 350 fiches retenues (première version du parser).
-- [ ] Nettoyer et normaliser les textes (normalisation de base faite ; redondances structurelles parent/enfant encore à corriger).
-- [ ] Contrôler les documents vides, anormalement courts ou anormalement longs.
+- [x] Nettoyer et normaliser les textes (normalisation de base + correction ciblée des redondances structurelles parent/enfant).
+- [x] Contrôler les documents vides, anormalement courts ou anormalement longs (0 vide ; extrêmes inspectés).
 - [ ] Sauvegarder le corpus textuel Service-Public final dans `data/processed/`.
 
 ### LEGI
@@ -253,19 +256,21 @@ Puis traiter localement les XML et ne sauvegarder sur Drive que les résultats u
 
 ## 5. Prochaine action immédiate
 
-La prochaine étape est désormais **le nettoyage qualitatif du texte extrait** avant de figer le corpus Service-Public.
+La prochaine étape est désormais **la réduction du corpus Service-Public à un périmètre réellement utile à l'assistant HLM**.
+
+L'échantillon de 20 documents montre que le simple filtre `dc:subject` contenant `Logement` est trop large : il inclut notamment urbanisme, copropriété, taxe d'aménagement, forage, piscines et travaux sans lien direct avec le logement social.
 
 Ordre conseillé :
 
-1. corriger le parser pour éviter les redondances parent/enfant observées dans certains encadrés (`ASavoir`, `Attention`, etc.) ;
-2. relancer le test sur `F10007`, `F18005`, `F12006`, `F869` et `F21051` ;
-3. relancer l'extraction des 350 fiches ;
-4. inspecter les documents les plus courts et les plus longs, notamment le minimum observé à 48 caractères / 8 mots ;
-5. lire manuellement au moins 20 documents et vérifier le périmètre ;
-6. figer le corpus textuel Service-Public propre dans `data/processed/`.
+1. enrichir les documents avec les métadonnées structurelles Service-Public (`SousThemePere`, `DossierPere`, fil d'Ariane) sans les injecter dans le texte ;
+2. définir des règles de périmètre explicites : cœur HLM/logement social + droits locatifs utiles, et exclusion des thèmes hors objectif ;
+3. produire un fichier d'audit avec chaque ID, titre, sous-thème, dossier, longueur et décision de conservation ;
+4. conserver les documents courts uniquement lorsqu'ils apportent une information substantielle ; exclure les stubs/redirections manifestes ;
+5. figer le corpus Service-Public retenu et documenter son nombre final ;
+6. vérifier les `gold_docs` du golden set dans ce corpus.
 
 Ensuite :
-- intégrer LEGI ;
+- intégrer LEGI pour compléter le corpus et tendre vers la cible d'environ 500 documents ;
 - définir et tester le vrai **chunking documentaire RAG** ;
 - commencer BM25 puis l'évaluation retrieval.
 
@@ -284,6 +289,18 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 9 octobre 2026 — parser corrigé, corpus audité et versionné
+
+- Correction ciblée de la déduplication : les conteneurs `ASavoir`, `Attention`, `ANoter`, `Exemple` et `Definition` sont dédupliqués sans supprimer les paragraphes métier.
+- Validation sur `F21051` : la phrase expliquant le surloyer et le seuil de **20 %** est conservée.
+- Extraction complète relancée : **350 documents**, **0 vide**, minimum **48 caractères / 8 mots**, maximum **45 331 caractères / 7 498 mots**, moyenne **9 872,5 caractères / 1 555,6 mots**.
+- Audit des 10 documents les plus courts et des 10 plus longs réalisé.
+- Lecture d'un échantillon reproductible de **20 documents** avec `random.seed(42)`.
+- Constat : le filtre `subject` contenant `Logement` est trop large pour un assistant HLM ; l'échantillon contient notamment taxe d'aménagement, forage, copropriété, piscine et urbanisme.
+- Le parser a été commité et poussé sur `origin/main` et sur le dépôt `review` au commit `52d1539`.
+- Prochaine action : enrichir les métadonnées hiérarchiques puis définir un périmètre Service-Public ciblé avant chunking.
+
 
 ### 9 octobre 2026 — première correction de redondance à ajuster
 
@@ -342,4 +359,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 9 octobre 2026 — première extraction des 350 fiches Service-Public ; nettoyage qualitatif en cours.*
+*Dernière mise à jour : 9 octobre 2026 — parser corrigé et versionné ; audit de pertinence du corpus Service-Public en cours.*
