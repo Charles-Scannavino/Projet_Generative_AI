@@ -202,6 +202,8 @@ Ablations attendues :
 - **GitHub est désormais la source de vérité** pour le code, le notebook, la documentation et les fichiers d'évaluation.
 - Google Drive / le stockage local restent utilisés pour les données de travail volumineuses et l'exécution Colab.
 - Avant toute modification importante, lire la version courante de `Docs/CONTEXT.md` et `Docs/AVANCEMENT.md` depuis le dépôt et vérifier l'état de la branche `main`.
+- L'environnement local du projet est maintenant géré avec **uv** et Python **3.12+**.
+- `pyproject.toml` et `uv.lock` sont versionnés à la racine du dépôt.
 
 ### Finalisation
 Le notebook sert au prototypage, à l'exploration et aux expériences.
@@ -217,8 +219,8 @@ La version finale devra être modularisée en fichiers `.py`, afin de permettre 
 ```text
 Projet_Generative_AI/
 ├── README.md
-├── pyproject.toml                  # à créer lors de la modularisation
-├── uv.lock                         # à créer avec uv
+├── pyproject.toml
+├── uv.lock
 ├── .env.example                    # à créer avant la livraison
 ├── .gitignore
 ├── Docs/
@@ -269,6 +271,9 @@ Les dossiers de code encore vides sont conservés avec des fichiers `.gitkeep` j
 - **350 fiches** dont le sujet contient `Logement` constituent le corpus Service-Public de travail ;
 - un filtre logement élargi retourne **505 fiches**, avec des faux positifs ;
 - le golden set actif contient désormais **20 questions** (18 RAG, 1 hors périmètre, 1 prompt injection) ;
+- l'environnement local `uv` est initialisé avec `pyproject.toml` et `uv.lock` ;
+- les dépendances de base sont installées : `lxml`, `numpy`, `pandas`, `pydantic`, `rank-bm25`, `tqdm` et `pytest` ;
+- l'arborescence modulaire `src/ingestion`, `src/preprocessing`, `src/retrieval`, `src/tools` et `src/agent` existe ;
 - LEGI, RPLS, DVF et les plafonds restent à intégrer ;
 - le chunking RAG au sens documentaire n'a pas encore été finalisé ;
 - BM25, dense retrieval, recherche hybride, reranker, agent et évaluation complète restent à construire.
@@ -310,4 +315,4 @@ Important : **ne pas confondre les numéros de cellules du notebook (« chunk 22
 
 ---
 
-*Dernière mise à jour : 8 octobre 2026 — migration du projet vers GitHub et structuration du dépôt.*
+*Dernière mise à jour : 9 octobre 2026 — environnement local uv/Python et arborescence modulaire confirmés.*
