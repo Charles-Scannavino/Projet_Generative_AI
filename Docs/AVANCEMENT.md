@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** 🔍 Sélection du corpus Service-Public terminée à titre provisoire ; extraction du texte complet à réaliser.
+**Statut actuel :** 🧹 Parser Service-Public opérationnel ; 350 fiches Logement extraites, avec nettoyage qualitatif à corriger avant de figer le corpus.
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -12,7 +12,10 @@
 - 350 fiches rattachées au sujet `Logement` ont été retenues comme **corpus Service-Public de travail** ;
 - 505 fiches apparaissent dans le filtre logement élargi, mais ce filtre contient des faux positifs et n'est pas retenu tel quel ;
 - 24 fiches correspondent au filtre HLM strict ;
-- la prochaine étape est d'extraire et contrôler le **texte complet** des 350 fiches de travail, avant d'intégrer LEGI.
+- un parser local `src/ingestion/service_public.py` a été créé et testé sur 5 fiches de référence ;
+- les 350 fiches contenant `Logement` dans `dc:subject` ont été extraites dans `data/processed/service_public_documents.jsonl` ;
+- aucun document n'est vide, mais le contrôle visuel révèle des redondances parent/enfant dans certains blocs (`ASavoir`, `Attention`, etc.) ;
+- certains documents sont anormalement courts (minimum observé : 48 caractères / 8 mots) et doivent être inspectés avant de figer le corpus.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -36,7 +39,7 @@
 - [x] Dépôt GitHub de référence connecté : `Charles-Scannavino/Projet_Generative_AI`.
 - [x] Arborescence GitHub structurée en `Docs/`, `notebooks/`, `eval/`, `data/`, `src/` et `app/`.
 - [x] Décision prise de modulariser ensuite le notebook en fichiers `.py`.
-- [ ] Préparer l'environnement local final avec `uv`.
+- [x] Préparer l'environnement local final avec `uv` (`pyproject.toml`, `uv.lock`, Python 3.12.7 vérifié).
 - [ ] Vérifier l'exécution locale du projet sur laptop.
 - [ ] Mettre en place Ollama / modèle local.
 
@@ -57,8 +60,8 @@
 - [x] Décision provisoire : utiliser les **350 fiches dont `subject` contient `Logement`** comme corpus Service-Public de travail.
 - [x] Métadonnées de ce corpus sauvegardées dans `data/processed/service_public_logement_metadata.csv`.
 - [ ] Inspecter plus finement les 350 titres / contenus pour exclure les fiches manifestement hors périmètre si nécessaire.
-- [ ] Extraire le texte complet des 350 fiches retenues.
-- [ ] Nettoyer et normaliser les textes.
+- [x] Extraire le texte complet des 350 fiches retenues (première version du parser).
+- [ ] Nettoyer et normaliser les textes (normalisation de base faite ; redondances structurelles parent/enfant encore à corriger).
 - [ ] Contrôler les documents vides, anormalement courts ou anormalement longs.
 - [ ] Sauvegarder le corpus textuel Service-Public final dans `data/processed/`.
 
@@ -250,21 +253,19 @@ Puis traiter localement les XML et ne sauvegarder sur Drive que les résultats u
 
 ## 5. Prochaine action immédiate
 
-La prochaine étape est désormais **l'extraction du texte complet des 350 fiches Service-Public de travail**.
+La prochaine étape est désormais **le nettoyage qualitatif du texte extrait** avant de figer le corpus Service-Public.
 
 Ordre conseillé :
 
-1. écrire une fonction robuste d'extraction du contenu utile des XML ;
-2. tester cette fonction sur 5 à 10 fiches connues, dont `F10007`, `F18005`, `F12006` ;
-3. vérifier que le texte extrait conserve les titres de sections et ne duplique pas excessivement le contenu ;
-4. appliquer la fonction aux 350 fiches ;
-5. calculer la longueur de chaque document ;
-6. repérer les textes vides, très courts ou anormalement longs ;
-7. sauvegarder le corpus textuel propre dans `data/processed/`.
+1. corriger le parser pour éviter les redondances parent/enfant observées dans certains encadrés (`ASavoir`, `Attention`, etc.) ;
+2. relancer le test sur `F10007`, `F18005`, `F12006`, `F869` et `F21051` ;
+3. relancer l'extraction des 350 fiches ;
+4. inspecter les documents les plus courts et les plus longs, notamment le minimum observé à 48 caractères / 8 mots ;
+5. lire manuellement au moins 20 documents et vérifier le périmètre ;
+6. figer le corpus textuel Service-Public propre dans `data/processed/`.
 
 Ensuite :
 - intégrer LEGI ;
-- lire manuellement au moins 20 documents ;
 - définir et tester le vrai **chunking documentaire RAG** ;
 - commencer BM25 puis l'évaluation retrieval.
 
@@ -283,6 +284,19 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 9 octobre 2026 — parser Service-Public et première extraction complète
+
+- Environnement local vérifié : Python **3.12.7**, dépendances importables avec `uv`.
+- `src/ingestion/service_public.py` créé localement et compilé sans erreur de syntaxe.
+- Test sur 5 fiches de référence : `F10007`, `F18005`, `F12006`, `F869`, `F21051`.
+- Résultat du test : **5 documents**, **0 vide**, tous les identifiants attendus présents.
+- Première extraction du corpus Logement : **350 documents**, **0 vide**.
+- Longueurs observées : minimum **48 caractères / 8 mots**, maximum **54 224 caractères / 8 940 mots**, moyenne **12 029 caractères / 1 888,7 mots**.
+- Répartition des sujets : 333 `Logement`, 13 `Logement, Secteurs d'activité`, 2 `Logement, Fiscalité`, 1 `Logement, Secteurs d'activité, Environnement`, 1 `Argent - Impôts - Consommation, Logement`.
+- Le contrôle visuel montre des répétitions sémantiques dues à l'extraction simultanée de conteneurs et de leurs sous-blocs (par exemple un encadré `À savoir` puis son titre/paragraphe). Le contrôle « doublons stricts = 0 » ne suffit donc pas.
+- Prochaine action : corriger cette redondance structurelle, relancer l'extraction, puis auditer les documents extrêmes avant de figer le corpus.
+
 
 ### 8 octobre 2026 — migration et structuration GitHub
 
@@ -319,4 +333,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 8 octobre 2026 — migration et structuration GitHub.*
+*Dernière mise à jour : 9 octobre 2026 — première extraction des 350 fiches Service-Public ; nettoyage qualitatif en cours.*
