@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Audit de périmètre Service-Public exécuté ; 125 fiches KEEP, 33 REVIEW, 192 EXCLUDE. Revue manuelle des 33 cas en cours avant génération du corpus HLM final.
+**Statut actuel :** ✅ Corpus Service-Public HLM final généré et contrôlé : **117 fiches conservées**, **233 exclues**, **0 document vide**, **0 doublon**, **15/15 `gold_docs` présents**. Prochaine étape : intégration de LEGI.
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -21,9 +21,11 @@
 - audit hiérarchique réalisé sur les 350 fiches : 107 `Bail d’habitation`, 63 `Urbanisme`, 47 `Copropriété`, 40 `Aides financières pour le logement`, 31 `Vie pratique dans un logement`, 28 `Achat immobilier`, 26 `Protection et sécurité de l'habitat`, 8 `Expropriation - Préemption` ;
 - dossiers particulièrement pertinents identifiés : `Accéder à un logement social` (8), `Aides personnelles au logement` (8), ainsi que plusieurs dossiers de bail d'habitation ;
 - classification automatique du périmètre exécutée : **125 KEEP**, **33 REVIEW**, **192 EXCLUDE** ;
-- les **15 `gold_docs`** du golden set actif sont tous conservés (`Gold docs manquants : []`) ;
-- `origin/main` et `review/main` ont été synchronisés sur le même commit `cc2103723f64e55a2d402fc08b35509690fc2807` ;
-- prochaine étape : trancher les 33 documents `REVIEW`, générer le corpus Service-Public HLM final, puis vérifier à nouveau les `gold_docs`.
+- revue manuelle terminée : les **33 `REVIEW`** ont été exclus du cœur HLM ; parmi les **13 `social_keyword`**, **5** ont été conservés et **8** exclus ;
+- corpus Service-Public HLM final généré : **117 KEEP**, **233 EXCLUDE**, **0 REVIEW** ;
+- contrôles finaux validés : **0 document vide**, **0 doublon**, **15/15 `gold_docs` présents**, aucun `gold_doc` manquant ;
+- fichiers générés : `data/processed/service_public_hlm_documents.jsonl` et `data/processed/service_public_scope_decisions_final.csv` ;
+- prochaine étape : intégrer LEGI afin de compléter le corpus documentaire avant les expérimentations de chunking.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -71,7 +73,7 @@
 - [x] Extraire le texte complet des 350 fiches retenues (première version du parser).
 - [x] Nettoyer et normaliser les textes (normalisation de base + correction ciblée des redondances structurelles parent/enfant).
 - [x] Contrôler les documents vides, anormalement courts ou anormalement longs (0 vide ; extrêmes inspectés).
-- [ ] Sauvegarder le corpus textuel Service-Public final dans `data/processed/`.
+- [x] Sauvegarder le corpus textuel Service-Public final dans `data/processed/` (`service_public_hlm_documents.jsonl`, **117 documents**).
 
 ### LEGI
 
@@ -113,7 +115,7 @@
   - prompt injection ;
   - pièges causaux ;
   - abstention.
-- [ ] Vérifier les `gold_docs` avec les identifiants réels du corpus.
+- [x] Vérifier les `gold_docs` avec les identifiants réels du corpus (**15/15 présents**).
 - [ ] Ne pas remplir artificiellement les réponses ou sources avant validation des données.
 
 ### Retrieval
@@ -266,23 +268,21 @@ Puis traiter localement les XML et ne sauvegarder sur Drive que les résultats u
 
 ## 5. Prochaine action immédiate
 
-La prochaine étape est désormais **la réduction du corpus Service-Public à un périmètre réellement utile à l'assistant HLM**.
+Le corpus Service-Public est désormais **figé à 117 documents** après audit du périmètre et contrôles qualité. Les **15 `gold_docs`** du golden set actif sont présents.
 
-L'échantillon de 20 documents montre que le simple filtre `dc:subject` contenant `Logement` est trop large : il inclut notamment urbanisme, copropriété, taxe d'aménagement, forage, piscines et travaux sans lien direct avec le logement social.
+La prochaine étape est **l'intégration de LEGI — Code de la construction et de l'habitation** :
 
-Ordre conseillé :
+1. identifier les articles réellement utiles au logement social ;
+2. définir l'unité documentaire, idéalement **un article = un document** ;
+3. récupérer et parser le texte avec ses métadonnées juridiques ;
+4. contrôler les documents vides, doublons et métadonnées ;
+5. fusionner LEGI avec les 117 fiches Service-Public ;
+6. vérifier la cohérence du corpus documentaire global avec la cible d'environ 500 documents.
 
-1. les métadonnées hiérarchiques Service-Public ont été auditées dans `data/processed/service_public_scope_audit.csv` ;
-2. définir et appliquer des règles explicites de sélection : cœur HLM/logement social + droits locatifs utiles, exclusion de l'urbanisme/copropriété/travaux hors périmètre ;
-3. produire un fichier d'audit avec décision `KEEP` / `EXCLUDE` et raison ;
-4. forcer l'inclusion de tous les `gold_docs` du golden set actif ;
-5. figer le corpus Service-Public retenu et documenter son nombre final ;
-6. vérifier que tous les `gold_docs` sont présents dans le corpus final.
-
-Ensuite :
-- intégrer LEGI pour compléter le corpus et tendre vers la cible d'environ 500 documents ;
-- définir et tester le vrai **chunking documentaire RAG** ;
-- commencer BM25 puis l'évaluation retrieval.
+Après LEGI :
+- définir et comparer plusieurs stratégies de **chunking documentaire** ;
+- implémenter **BM25** ;
+- mesurer `Recall@5`, `Recall@10` et `MRR` sur le golden set.
 
 ## 6. Règle de mise à jour de ce fichier
 
@@ -299,6 +299,19 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 9 octobre 2026 — corpus Service-Public HLM final figé
+
+- Revue manuelle du périmètre terminée.
+- Les **33 documents `REVIEW`** ont été reclassés hors du cœur HLM.
+- Les **13 documents conservés uniquement par `social_keyword`** ont été audités : **5 conservés**, **8 exclus**.
+- Script `src/preprocessing/build_service_public_hlm_corpus.py` exécuté localement.
+- Corpus final généré dans `data/processed/service_public_hlm_documents.jsonl`.
+- Décisions finales générées dans `data/processed/service_public_scope_decisions_final.csv`.
+- Résultat final : **117 documents conservés**, **233 exclus**, **0 document vide**, **0 doublon**.
+- Vérification du golden set : **15 gold_docs attendus, 15 présents, 0 manquant**.
+- Prochaine action : intégrer LEGI avant le chunking documentaire et l'implémentation de BM25.
+
 
 ### 9 octobre 2026 — classification du périmètre et synchronisation des dépôts
 
@@ -388,4 +401,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 9 octobre 2026 — parser corrigé et versionné ; audit de pertinence du corpus Service-Public en cours.*
+*Dernière mise à jour : 9 octobre 2026 — corpus Service-Public HLM final figé à 117 documents ; prochaine étape : intégration de LEGI.*
