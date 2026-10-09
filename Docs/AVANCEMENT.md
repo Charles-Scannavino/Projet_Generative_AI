@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** 🔎 Parser Service-Public corrigé et versionné ; 350 fiches Logement extraites, audit de pertinence du corpus en cours avant chunking.
+**Statut actuel :** ✅ Audit de périmètre Service-Public exécuté ; 125 fiches KEEP, 33 REVIEW, 192 EXCLUDE. Revue manuelle des 33 cas en cours avant génération du corpus HLM final.
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -20,7 +20,10 @@
 - un échantillon reproductible de 20 documents (seed 42) a été lu et montre que le thème `Logement` est trop large pour l'assistant HLM : il contient aussi urbanisme, copropriété, piscines, taxe d'aménagement, forage, etc. ;
 - audit hiérarchique réalisé sur les 350 fiches : 107 `Bail d’habitation`, 63 `Urbanisme`, 47 `Copropriété`, 40 `Aides financières pour le logement`, 31 `Vie pratique dans un logement`, 28 `Achat immobilier`, 26 `Protection et sécurité de l'habitat`, 8 `Expropriation - Préemption` ;
 - dossiers particulièrement pertinents identifiés : `Accéder à un logement social` (8), `Aides personnelles au logement` (8), ainsi que plusieurs dossiers de bail d'habitation ;
-- prochaine étape : construire un corpus HLM ciblé avec règles explicites + inclusion forcée des `gold_docs`.
+- classification automatique du périmètre exécutée : **125 KEEP**, **33 REVIEW**, **192 EXCLUDE** ;
+- les **15 `gold_docs`** du golden set actif sont tous conservés (`Gold docs manquants : []`) ;
+- `origin/main` et `review/main` ont été synchronisés sur le même commit `cc2103723f64e55a2d402fc08b35509690fc2807` ;
+- prochaine étape : trancher les 33 documents `REVIEW`, générer le corpus Service-Public HLM final, puis vérifier à nouveau les `gold_docs`.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -291,6 +294,16 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 9 octobre 2026 — classification du périmètre et synchronisation des dépôts
+
+- Fichier `data/processed/service_public_scope_decisions.csv` généré.
+- Répartition automatique : **125 KEEP**, **33 REVIEW**, **192 EXCLUDE**.
+- Raisons principales : 97 `core_dossier`, 15 `gold_doc`, 13 `social_keyword`, 26 `related_subtheme`, 7 `very_short`, 192 `outside_hlm_scope`.
+- Vérification du golden set : **15 gold_docs attendus, 0 manquant, tous conservés**.
+- Les dépôts `origin/main` et `review/main` sont synchronisés sur le commit `cc2103723f64e55a2d402fc08b35509690fc2807`.
+- Prochaine action : revue manuelle des 33 documents `REVIEW`, puis génération du corpus Service-Public HLM final.
+
 
 ### 9 octobre 2026 — audit hiérarchique du périmètre Service-Public
 
