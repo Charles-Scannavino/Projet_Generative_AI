@@ -41,7 +41,7 @@ uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 Le suivi détaillé se trouve dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
 Les règles et décisions durables du projet se trouvent dans [Docs/CONTEXT.md](Docs/CONTEXT.md).
 
-## Arborescencze
+## Arborescence
 
 ```text
 Projet_Generative_AI/
