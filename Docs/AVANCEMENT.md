@@ -189,6 +189,11 @@
 
 ### Interface et livraison
 
+### Bonus évoqués par l'enseignant
+
+En complément du périmètre principal, deux pistes peuvent apporter une valeur supplémentaire au projet : **exposer la solution via un serveur MCP**, afin de pouvoir brancher notre assistant et ses outils à différents LLM compatibles, et **préparer une mise en production simple**, de façon à ce qu'un utilisateur puisse lancer et utiliser la solution finale depuis son propre ordinateur sans dépendre de notre environnement de développement. Ces éléments sont considérés comme des bonus et ne doivent pas retarder les fonctionnalités principales du RAG, de l'agent et de l'évaluation.
+
+
 - [ ] Créer une interface simple Streamlit si le temps le permet.
 - [ ] Afficher réponse, sources et trace de l'agent.
 - [x] README initial du dépôt rédigé et mis à jour avec l'architecture, l'état du projet et le workflow.
