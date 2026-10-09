@@ -110,7 +110,7 @@ eval/golden_backlog_pending.jsonl
 ## Sécurité et versionnement
 
 - ne jamais committer de clé API ;
-- utiliser un fichier `.env` local et git-ignoré ;
+- utiliser un fichier .env local et .gitignore ;
 - ne pas committer les XML extraits, caches de modèles, index vectoriels ou résultats volumineux ;
 - les versions exactes des modèles seront ajoutées au README lorsqu'elles seront figées.
 
