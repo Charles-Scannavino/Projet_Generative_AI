@@ -300,6 +300,18 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 10 octobre 2026 — audit LEGI au niveau article
+
+- Le Parquet du Code de la construction et de l'habitation a été audité au niveau des articles en vigueur.
+- **4 559 lignes/chunks VIGUEUR** correspondent à **4 047 `doc_id` uniques**.
+- **232 articles** sont répartis sur plusieurs chunks, avec un maximum observé de **83 chunks pour un article**.
+- Pour ces 232 articles, le champ `text` varie entre les chunks : il ne faut donc **pas** conserver arbitrairement la première ligne par `doc_id`.
+- Le périmètre juridique ciblé contient **338 articles uniques** : **336** du Titre IV « Rapports des organismes HLM et des bénéficiaires », plus `L300-1` (DALO) et `L411` (socle général HLM).
+- Répartition des 338 candidats : **159 R**, **143 L**, **36 D** ; **0 document vide** et **0 doublon de `doc_id`** dans l'audit.
+- Avec les **117** fiches Service-Public déjà figées, ce périmètre conduirait à **455 documents** avant chunking, ce qui est cohérent avec la cible d'environ 500 documents.
+- Prochaine action : diagnostiquer précisément la relation entre `text` et `chunk_text` pour reconstruire correctement chaque article multi-chunk avant génération du corpus LEGI final.
+
+
 ### 10 octobre 2026 — accès LEGI via AgentPublic/legi validé
 
 - L'accès direct aux pages Légifrance par `curl` a été abandonné après réponses HTTP **403**.
