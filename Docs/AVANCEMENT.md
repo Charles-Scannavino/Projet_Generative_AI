@@ -305,8 +305,11 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - L'accès direct aux pages Légifrance par `curl` a été abandonné après réponses HTTP **403**.
 - La source `AgentPublic/legi` a été testée avec `datasets.load_dataset(..., streaming=True)`.
 - Le dataset expose bien les champs nécessaires au projet : `doc_id`, `nature`, `category`, `status`, `title`, `number`, `start_date`, `end_date`, `subtitles` et `text`.
-- Cinq articles du **Code de la construction et de l'habitation** ont été lus avec succès ; le test confirme aussi la présence de plusieurs versions historiques (`MODIFIE`, `ABROGE`), ce qui impose de filtrer les versions en vigueur avant constitution du corpus.
-- Prochaine action : télécharger uniquement les fichiers Parquet du Code de la construction et de l'habitation, auditer les articles `VIGUEUR` et définir le sous-ensemble HLM/DALO.
+- Cinq articles du **Code de la construction et de l'habitation** ont été lus avec succès ; le test confirme aussi la présence de plusieurs versions historiques (`MODIFIE`, `ABROGE`).
+- Le fichier Parquet dédié au CCH a ensuite été identifié et téléchargé : **1 fichier, 89,2 Mo**.
+- Le Parquet contient **16 599 lignes/chunks** au total, dont **4 559 lignes `VIGUEUR`** ; le premier filtre structurel HLM/DALO retourne **938 lignes candidates**.
+- Point important : `AgentPublic/legi` est déjà chunké (`chunk_id`, `chunk_index`, `chunk_text`, embeddings). Pour respecter notre propre expérimentation de chunking, le corpus LEGI doit être reconstruit au niveau **document/article** à partir de `doc_id` et `text`, en ignorant les chunks et embeddings fournis.
+- Prochaine action : mesurer le nombre de `doc_id` uniques, dédupliquer les lignes par article, puis resserrer le périmètre sur le Titre IV HLM et le socle DALO avant de générer le corpus LEGI final.
 
 
 ### 9 octobre 2026 — corpus Service-Public HLM final figé
