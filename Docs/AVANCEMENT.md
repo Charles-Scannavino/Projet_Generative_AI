@@ -300,6 +300,15 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 10 octobre 2026 — accès LEGI via AgentPublic/legi validé
+
+- L'accès direct aux pages Légifrance par `curl` a été abandonné après réponses HTTP **403**.
+- La source `AgentPublic/legi` a été testée avec `datasets.load_dataset(..., streaming=True)`.
+- Le dataset expose bien les champs nécessaires au projet : `doc_id`, `nature`, `category`, `status`, `title`, `number`, `start_date`, `end_date`, `subtitles` et `text`.
+- Cinq articles du **Code de la construction et de l'habitation** ont été lus avec succès ; le test confirme aussi la présence de plusieurs versions historiques (`MODIFIE`, `ABROGE`), ce qui impose de filtrer les versions en vigueur avant constitution du corpus.
+- Prochaine action : télécharger uniquement les fichiers Parquet du Code de la construction et de l'habitation, auditer les articles `VIGUEUR` et définir le sous-ensemble HLM/DALO.
+
+
 ### 9 octobre 2026 — corpus Service-Public HLM final figé
 
 - Revue manuelle du périmètre terminée.
