@@ -300,6 +300,15 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 10 octobre 2026 — diagnostic des chevauchements LEGI
+
+- **512 paires** de chunks successifs ont été analysées sur les articles LEGI multi-chunks.
+- **505 paires** ne présentent aucun chevauchement exact ; **7 paires** seulement présentent un chevauchement, avec un maximum de **18 caractères**.
+- Les chevauchements de 1 caractère observés sont compatibles avec de simples coïncidences de frontière ; les autres restent très courts (4, 11, 16 et 18 caractères).
+- Décision de reconstruction : concaténer les morceaux `text` dans l'ordre de `chunk_index` en conservant intégralement le texte, plutôt que supprimer automatiquement des suffixes/préfixes et risquer d'altérer un texte juridique.
+- Prochaine action : générer `data/processed/legi_hlm_documents.jsonl` avec **1 `doc_id` = 1 article reconstruit**, puis contrôler vides, doublons et couverture du périmètre cible.
+
+
 ### 10 octobre 2026 — diagnostic de reconstruction des articles LEGI
 
 - Diagnostic exécuté sur les articles `VIGUEUR` du CCH : **232 articles** sont répartis sur plusieurs chunks.
