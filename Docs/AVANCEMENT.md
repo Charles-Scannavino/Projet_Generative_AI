@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus Service-Public HLM final généré et contrôlé : **117 fiches conservées**, **233 exclues**, **0 document vide**, **0 doublon**, **15/15 `gold_docs` présents**. Prochaine étape : intégration de LEGI.
+**Statut actuel :** ✅ Corpus Service-Public (**117 documents**) et corpus LEGI HLM (**338 articles**) générés et contrôlés. Corpus combiné attendu : **455 documents** avant chunking. Prochaine étape : fusion des deux sources puis expérimentations de chunking.
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -78,10 +78,10 @@
 ### LEGI
 
 - [ ] Identifier précisément le sous-ensemble du Code de la construction et de l'habitation utile au projet.
-- [ ] Télécharger / récupérer les articles.
-- [ ] Définir l'unité documentaire.
-- [ ] Parser les métadonnées et le texte.
-- [ ] Ajouter les documents LEGI au corpus final.
+- [x] Télécharger / récupérer les articles (Parquet CCH AgentPublic/LEGI).
+- [x] Définir l'unité documentaire : **1 `doc_id` = 1 article juridique reconstruit**.
+- [x] Parser les métadonnées et reconstruire le texte des articles multi-chunks.
+- [x] Générer le corpus LEGI HLM final : `data/processed/legi_hlm_documents.jsonl` (**338 articles**).
 - [ ] Vérifier que l'ensemble Service-Public + LEGI est cohérent avec la cible d'environ 500 documents.
 
 ### Chunking documentaire
@@ -299,6 +299,20 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 10 octobre 2026 — corpus LEGI HLM final généré
+
+- Script `src/preprocessing/build_legi_hlm_corpus.py` exécuté avec succès.
+- Périmètre source : **4 559 lignes/chunks VIGUEUR**, correspondant à **4 047 `doc_id` uniques**.
+- Périmètre juridique ciblé : **373 lignes/chunks**, correspondant à **338 articles uniques**.
+- Reconstruction validée : **338 documents**, **0 vide**, **0 doublon de `doc_id`**, **338 numéros d'article uniques**.
+- **27 articles** du périmètre final étaient multi-chunks et ont été reconstruits dans l'ordre de `chunk_index`.
+- Répartition : **159 articles R**, **143 articles L**, **36 articles D**.
+- Longueurs : minimum **12 mots**, maximum **2 868 mots**, moyenne **209,1 mots**.
+- Fichiers générés : `data/processed/legi_hlm_documents.jsonl` et `data/processed/legi_hlm_documents_audit.csv`.
+- Avec les **117** fiches Service-Public déjà figées, le corpus documentaire combiné attendu est de **455 documents** avant chunking.
+- Prochaine action : fusionner Service-Public et LEGI dans un corpus documentaire commun, effectuer les contrôles finaux, puis commencer les expérimentations de chunking.
+
 
 ### 10 octobre 2026 — diagnostic des chevauchements LEGI
 
