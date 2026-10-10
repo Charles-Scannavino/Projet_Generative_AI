@@ -300,6 +300,15 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 10 octobre 2026 — diagnostic de reconstruction des articles LEGI
+
+- Diagnostic exécuté sur les articles `VIGUEUR` du CCH : **232 articles** sont répartis sur plusieurs chunks.
+- Un seul article a un champ `text` dont la version la plus longue contient toutes les autres ; **231 articles nécessitent donc une reconstruction ordonnée**.
+- Les exemples les plus fragmentés confirment que `text` contient des morceaux successifs de l'article alors que `chunk_text` ajoute surtout le contexte hiérarchique et le titre.
+- Maximum observé : **83 chunks** pour `LEGIARTI000054024988` (annexe à l'article R172-4).
+- Prochaine action : mesurer les chevauchements entre morceaux `text` successifs, puis reconstruire les articles en concaténant les chunks dans l'ordre sans duplication.
+
+
 ### 10 octobre 2026 — audit LEGI au niveau article
 
 - Le Parquet du Code de la construction et de l'habitation a été audité au niveau des articles en vigueur.
