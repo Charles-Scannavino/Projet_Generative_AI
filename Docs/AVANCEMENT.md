@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus Service-Public (**117 documents**) et corpus LEGI HLM (**338 articles**) générés et contrôlés. Corpus combiné attendu : **455 documents** avant chunking. Prochaine étape : fusion des deux sources puis expérimentations de chunking.
+**Statut actuel :** ✅ Corpus documentaire RAG combiné généré et contrôlé : **455 documents** au total (**117 Service-Public + 338 LEGI**), **0 identifiant vide**, **0 texte vide**, **0 titre vide**, **0 doublon**. Prochaine étape : expérimentations de chunking documentaire.
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -82,7 +82,7 @@
 - [x] Définir l'unité documentaire : **1 `doc_id` = 1 article juridique reconstruit**.
 - [x] Parser les métadonnées et reconstruire le texte des articles multi-chunks.
 - [x] Générer le corpus LEGI HLM final : `data/processed/legi_hlm_documents.jsonl` (**338 articles**).
-- [ ] Vérifier que l'ensemble Service-Public + LEGI est cohérent avec la cible d'environ 500 documents.
+- [x] Vérifier que l'ensemble Service-Public + LEGI est cohérent avec la cible d'environ 500 documents : **455 documents**.
 
 ### Chunking documentaire
 
@@ -299,6 +299,18 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 10 octobre 2026 — corpus RAG combiné finalisé
+
+- Script `src/preprocessing/build_rag_corpus.py` exécuté avec succès.
+- Fusion des **117 documents Service-Public** et des **338 articles LEGI**.
+- Corpus combiné final : **455 documents**.
+- Contrôles qualité : **0 identifiant vide**, **0 texte vide**, **0 titre vide**, **0 doublon de `document_id`**.
+- Répartition par source : **338 LEGI**, **117 SERVICE_PUBLIC**.
+- Longueurs observées : minimum **8 mots**, maximum **7 498 mots**, moyenne **608,2 mots**.
+- Fichiers générés : `data/processed/rag_documents.jsonl` et `data/processed/rag_documents_audit.csv`.
+- Prochaine action : définir et comparer plusieurs stratégies de chunking documentaire avant l'implémentation de BM25.
+
 
 ### 10 octobre 2026 — corpus LEGI HLM final généré
 
