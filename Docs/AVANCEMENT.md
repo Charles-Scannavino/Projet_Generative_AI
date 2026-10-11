@@ -86,8 +86,8 @@
 
 ### Chunking documentaire
 
-- [ ] Lire manuellement un échantillon d'au moins 20 documents.
-- [ ] Définir plusieurs stratégies de chunking.
+- [x] Lire manuellement un échantillon d'au moins 20 documents.
+- [x] Définir plusieurs stratégies de chunking.
 - [ ] Tester au moins :
   - découpage par sections ;
   - taille fixe raisonnable avec overlap ;
@@ -299,6 +299,16 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 11 octobre 2026 — audit manuel du chunking terminé
+
+- L'échantillon stratifié de **20 documents** (10 Service-Public, 10 LEGI) a été relu.
+- **Service-Public** : les titres et sous-titres sont majoritairement conservés comme lignes séparées ; les documents longs comportent de nombreux paragraphes exploitables, mais contiennent aussi des glossaires, références et liens connexes en fin de fiche.
+- **LEGI** : les articles courts tiennent souvent en un seul paragraphe ; les articles plus longs sont structurés en alinéas/paragraphes numérotés mais disposent de moins de titres internes dans le texte lui-même.
+- Décision : conserver les petits documents entiers et comparer trois stratégies reproductibles : **fixed_300_60**, **fixed_500_100** et **paragraph_400_80** (paragraphes respectés autant que possible).
+- Chaque chunk devra conserver au minimum `chunk_id`, `document_id`, `source`, `title`, position/ordre du chunk et texte.
+- Prochaine action : générer les trois corpus de chunks, auditer leur distribution puis les comparer avec une baseline BM25 sur le golden set.
+
 
 ### 11 octobre 2026 — échantillon de 20 documents pour le chunking
 
