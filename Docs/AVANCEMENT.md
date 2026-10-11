@@ -300,6 +300,15 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 11 octobre 2026 — échantillon de 20 documents pour le chunking
+
+- Échantillon stratifié de **20 documents** généré dans `data/processed/chunking_sample_20.md`.
+- Répartition : **10 Service-Public** et **10 LEGI**, couvrant volontairement toute la distribution de longueur.
+- Service-Public observé dans l'échantillon : de **8 à 7 498 mots** ; LEGI : de **12 à 2 868 mots**.
+- L'échantillon est prêt pour la lecture manuelle des séparations de paragraphes, titres/sous-titres et gros blocs avant de figer les stratégies de chunking.
+- La tâche « lire manuellement au moins 20 documents » reste ouverte tant que cette lecture n'a pas été confirmée.
+
+
 ### 10 octobre 2026 — corpus RAG combiné finalisé
 
 - Script `src/preprocessing/build_rag_corpus.py` exécuté avec succès.
