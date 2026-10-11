@@ -1,0 +1,4 @@
+strategy,documents,chunks,chunks_per_document_mean,words_min,words_mean,words_median,words_p95,words_max
+fixed_300_60,455,1357,2.98,8,243.8,300.0,300.0,300
+fixed_500_100,455,944,2.07,8,345.0,500.0,500.0,500
+paragraph_400_80,455,1175,2.58,8,295.8,371.0,399.0,400
