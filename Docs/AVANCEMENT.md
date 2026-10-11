@@ -519,4 +519,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 9 octobre 2026 — corpus Service-Public HLM final figé à 117 documents ; prochaine étape : intégration de LEGI.*
+*Dernière mise à jour : 11 octobre 2026 — corpus RAG final à 455 documents ; comparaison BM25 terminée, chunking de référence `fixed_300_60` figé ; prochaine étape : dense retrieval / embeddings.*
