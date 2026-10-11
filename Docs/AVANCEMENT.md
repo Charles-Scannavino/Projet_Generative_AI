@@ -93,8 +93,8 @@
   - taille fixe raisonnable avec overlap ;
   - variante adaptée à la structure Service-Public / LEGI.
 - [x] Conserver les métadonnées dans chaque chunk (`chunk_id`, `document_id`, source, titre, article, URL, position, texte et `retrieval_text`).
-- [ ] Comparer les stratégies sur le golden set.
-- [ ] Figer le chunking final.
+- [x] Comparer les stratégies sur le golden set avec BM25.
+- [x] Figer le chunking final : `fixed_300_60` (300 mots, overlap 60).
 
 > ⚠️ Le « chunk 22 » mentionné dans la conversation désignait une **cellule du notebook**, pas un chunk documentaire RAG. Le vrai chunking reste à faire.
 
@@ -299,6 +299,16 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 11 octobre 2026 — chunking de référence figé après analyse d'erreurs BM25
+
+- Analyse des rangs BM25 réalisée sur les trois chunkings.
+- `fixed_300_60` conserve **Recall@5 = 1,0000** et **Recall@10 = 1,0000** ; 5 questions ont leur premier document pertinent après le rang 1, mais aucune ne sort du Top 5. Cas observés : q005 rang 2, q006 rang 2, q007 rang 2, q008 rang 4, q013 rang 5.
+- `paragraph_400_80` conserve également un rappel parfait à 5/10, mais avec un **MRR inférieur (0,8074)** et 6 questions dont le premier document pertinent n'est pas classé premier.
+- `fixed_500_100` est moins performant : q008 et q013 sortent du Top 5 (premiers documents pertinents aux rangs 8 et 6), d'où **Recall@5 = 0,8889** et **MRR = 0,7106**.
+- Décision : **`fixed_300_60` devient le chunking de référence** pour la suite des expériences, car il obtient le meilleur MRR tout en gardant un rappel parfait à 5 et 10.
+- Prochaine action : versionner le script et les sorties de l'expérience BM25, puis implémenter le dense retrieval sur le même chunking de référence.
+
 
 ### 11 octobre 2026 — comparaison BM25 des trois chunkings
 
