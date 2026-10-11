@@ -92,7 +92,7 @@
   - découpage par sections ;
   - taille fixe raisonnable avec overlap ;
   - variante adaptée à la structure Service-Public / LEGI.
-- [ ] Conserver les métadonnées dans chaque chunk.
+- [x] Conserver les métadonnées dans chaque chunk (`chunk_id`, `document_id`, source, titre, article, URL, position, texte et `retrieval_text`).
 - [ ] Comparer les stratégies sur le golden set.
 - [ ] Figer le chunking final.
 
@@ -299,6 +299,17 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 11 octobre 2026 — trois stratégies de chunking générées
+
+- Le script `src/preprocessing/build_chunks.py` a été exécuté sur les **455 documents** du corpus.
+- `fixed_300_60` : **1 357 chunks**, 2,98 chunks/document en moyenne, moyenne **243,8 mots**, médiane **300**, maximum **300**.
+- `fixed_500_100` : **944 chunks**, 2,07 chunks/document en moyenne, moyenne **345,0 mots**, médiane **500**, maximum **500**.
+- `paragraph_400_80` : **1 175 chunks**, 2,58 chunks/document en moyenne, moyenne **295,8 mots**, médiane **371**, p95 **399**, maximum **400**.
+- Les trois variantes couvrent les **455 documents**, avec **0 chunk vide** et **0 doublon de `chunk_id`**.
+- Ces statistiques ne suffisent pas à choisir une stratégie : le choix sera fait sur les performances de retrieval.
+- Prochaine action : construire une baseline BM25 identique pour les trois jeux de chunks et comparer **Recall@5**, **Recall@10** et **MRR** sur les **18 questions RAG** du golden set.
+
 
 ### 11 octobre 2026 — audit manuel du chunking terminé
 
