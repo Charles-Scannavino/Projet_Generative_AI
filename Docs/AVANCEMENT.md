@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus documentaire RAG combiné généré et contrôlé : **455 documents** au total (**117 Service-Public + 338 LEGI**), **0 identifiant vide**, **0 texte vide**, **0 titre vide**, **0 doublon**. Prochaine étape : expérimentations de chunking documentaire.
+**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**), baseline **BM25** et dense retrieval **E5** évalués sur les **18 questions RAG** du golden set. BM25 reste meilleur seul à ce stade. **Prochaine étape : recherche hybride BM25 + dense avec fusion RRF.**
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -25,7 +25,7 @@
 - corpus Service-Public HLM final généré : **117 KEEP**, **233 EXCLUDE**, **0 REVIEW** ;
 - contrôles finaux validés : **0 document vide**, **0 doublon**, **15/15 `gold_docs` présents**, aucun `gold_doc` manquant ;
 - fichiers générés : `data/processed/service_public_hlm_documents.jsonl` et `data/processed/service_public_scope_decisions_final.csv` ;
-- prochaine étape : intégrer LEGI afin de compléter le corpus documentaire avant les expérimentations de chunking.
+- étape actuelle : construire et évaluer la **recherche hybride BM25 + dense**, puis ajouter un reranker.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -50,7 +50,7 @@
 - [x] Arborescence GitHub structurée en `Docs/`, `notebooks/`, `eval/`, `data/`, `src/` et `app/`.
 - [x] Décision prise de modulariser ensuite le notebook en fichiers `.py`.
 - [x] Préparer l'environnement local final avec `uv` (`pyproject.toml`, `uv.lock`, Python 3.12.7 vérifié).
-- [ ] Vérifier l'exécution locale du projet sur laptop.
+- [x] Vérifier l'exécution locale du projet sur laptop (MacBook Pro Apple Silicon, PyTorch **MPS** opérationnel).
 - [ ] Mettre en place Ollama / modèle local.
 
 ### Service-Public — corpus brut
@@ -77,7 +77,7 @@
 
 ### LEGI
 
-- [ ] Identifier précisément le sous-ensemble du Code de la construction et de l'habitation utile au projet.
+- [x] Identifier précisément le sous-ensemble du Code de la construction et de l'habitation utile au projet.
 - [x] Télécharger / récupérer les articles (Parquet CCH AgentPublic/LEGI).
 - [x] Définir l'unité documentaire : **1 `doc_id` = 1 article juridique reconstruit**.
 - [x] Parser les métadonnées et reconstruire le texte des articles multi-chunks.
@@ -96,7 +96,6 @@
 - [x] Comparer les stratégies sur le golden set avec BM25.
 - [x] Figer le chunking final : `fixed_300_60` (300 mots, overlap 60).
 
-> ⚠️ Le « chunk 22 » mentionné dans la conversation désignait une **cellule du notebook**, pas un chunk documentaire RAG. Le vrai chunking reste à faire.
 
 ### Golden set
 
@@ -120,20 +119,20 @@
 
 ### Retrieval
 
-- [ ] Implémenter BM25.
-- [ ] Mesurer BM25 sur le golden set.
-- [ ] Implémenter le dense retrieval.
-- [ ] Choisir et documenter le modèle d'embedding.
-- [ ] Comparer dense et BM25.
+- [x] Implémenter BM25.
+- [x] Mesurer BM25 sur le golden set.
+- [x] Implémenter le dense retrieval.
+- [x] Choisir et documenter le modèle d'embedding : `intfloat/multilingual-e5-small` (**384 dimensions**), exécuté via `sentence-transformers` sur **MPS**.
+- [x] Comparer dense et BM25.
 - [ ] Implémenter la fusion hybride.
-- [ ] Tester une méthode de fusion, par exemple RRF.
+- [ ] Tester une méthode de fusion, en priorité **RRF (Reciprocal Rank Fusion)**.
 - [ ] Ajouter un reranker.
 - [ ] Comparer :
   - BM25 ;
   - dense ;
   - hybride ;
   - hybride + reranker.
-- [ ] Mesurer `Recall@5`, `Recall@10` et `MRR`.
+- [x] Mesurer `Recall@5`, `Recall@10` et `MRR` pour BM25 et dense.
 - [ ] Comparer avec la baseline DINUM si possible.
 
 ### RAG / génération
@@ -268,21 +267,33 @@ Puis traiter localement les XML et ne sauvegarder sur Drive que les résultats u
 
 ## 5. Prochaine action immédiate
 
-Le corpus Service-Public est désormais **figé à 117 documents** après audit du périmètre et contrôles qualité. Les **15 `gold_docs`** du golden set actif sont présents.
+Le corpus documentaire, le chunking de référence et les deux premiers retrievers sont maintenant opérationnels et versionnés.
 
-La prochaine étape est **l'intégration de LEGI — Code de la construction et de l'habitation** :
+État expérimental actuel sur les **18 questions RAG** du golden set :
 
-1. identifier les articles réellement utiles au logement social ;
-2. définir l'unité documentaire, idéalement **un article = un document** ;
-3. récupérer et parser le texte avec ses métadonnées juridiques ;
-4. contrôler les documents vides, doublons et métadonnées ;
-5. fusionner LEGI avec les 117 fiches Service-Public ;
-6. vérifier la cohérence du corpus documentaire global avec la cible d'environ 500 documents.
+```text
+BM25 — fixed_300_60
+Recall@5  : 1.0000
+Recall@10 : 1.0000
+MRR       : 0.8306
 
-Après LEGI :
-- définir et comparer plusieurs stratégies de **chunking documentaire** ;
-- implémenter **BM25** ;
-- mesurer `Recall@5`, `Recall@10` et `MRR` sur le golden set.
+Dense — intfloat/multilingual-e5-small
+Recall@5  : 0.9444
+Recall@10 : 1.0000
+MRR       : 0.7394
+```
+
+Le dense E5 seul est donc moins performant que BM25 sur ce golden set, mais il conserve un rappel parfait à 10. L'analyse d'erreurs montre notamment que **q006 / F21051** n'apparaît qu'au rang 7 en dense, tandis que plusieurs questions APL/ALF/ALS et juridiques font remonter des documents sémantiquement proches avant le document attendu.
+
+La prochaine étape est la **recherche hybride BM25 + dense** :
+
+1. produire les classements BM25 et dense sur le même chunking `fixed_300_60` ;
+2. fusionner les rangs avec **RRF** afin d'éviter de mélanger directement des scores de nature différente ;
+3. mesurer `Recall@5`, `Recall@10` et `MRR` sur les mêmes 18 questions ;
+4. comparer les erreurs de BM25, dense et hybride ;
+5. conserver la meilleure configuration avant d'ajouter un **reranker**.
+
+Le code dense et ses résultats sont versionnés, et `main`, `origin/main` et `review/main` sont synchronisés au commit **`8f22ce1f71bdd46f5b85047a7632018ea85660a8`**.
 
 ## 6. Règle de mise à jour de ce fichier
 
@@ -299,6 +310,17 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 11 octobre 2026 — dense retrieval versionné et dépôts synchronisés
+
+- Dépendance `sentence-transformers` ajoutée ; environnement local validé avec **PyTorch 2.14.1** et **MPS disponible**.
+- `src/retrieval/dense.py`, `eval/eval_dense.py`, `eval/dense/details.csv` et `eval/dense/summary.csv` créés et versionnés.
+- Analyse d'erreurs dense : q003 rang 2, q004 rang 4, q005 rang 2, **q006 rang 7**, q013 rang 4, q014 rang 3, q015 rang 3.
+- Résultats denses confirmés : **Recall@5 = 0,9444**, **Recall@10 = 1,0000**, **MRR = 0,7394** ; BM25 reste supérieur seul (**1,0000 / 1,0000 / 0,8306**).
+- Commit dense après rebase/push : **`8f22ce1f71bdd46f5b85047a7632018ea85660a8`**.
+- Vérification finale : **LOCAL = ORIGIN = REVIEW = 8f22ce1f71bdd46f5b85047a7632018ea85660a8**.
+- Prochaine action : implémenter et évaluer la fusion hybride **BM25 + dense par RRF**.
+
 
 ### 11 octobre 2026 — dense retrieval E5 évalué
 
@@ -529,4 +551,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 11 octobre 2026 — dense retrieval E5 évalué sur 1 357 chunks ; BM25 reste meilleur seul sur le golden set ; prochaine étape : analyse d'erreurs puis recherche hybride BM25 + dense.*
+*Dernière mise à jour : 11 octobre 2026 — dense retrieval E5 versionné et synchronisé sur les deux dépôts ; analyse d'erreurs terminée ; prochaine étape : recherche hybride BM25 + dense avec fusion RRF.*
