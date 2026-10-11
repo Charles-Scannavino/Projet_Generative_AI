@@ -300,6 +300,16 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 11 octobre 2026 — dense retrieval E5 évalué
+
+- Modèle dense évalué : `intfloat/multilingual-e5-small`, dimension **384**, exécuté sur **MPS**.
+- Corpus dense : **1 357 chunks** issus du chunking de référence `fixed_300_60`.
+- Temps de construction de l'index dense : **23,46 s** ; latence moyenne de requête : **33,37 ms/question**.
+- Résultats sur les **18 questions RAG** du golden set : **Recall@5 = 0,9444**, **Recall@10 = 1,0000**, **MRR = 0,7394**.
+- Baseline BM25 sur le même chunking : **Recall@5 = 1,0000**, **Recall@10 = 1,0000**, **MRR = 0,8306**.
+- Conclusion provisoire : le dense E5 seul est moins performant que BM25 sur ce golden set, mais conserve un rappel parfait à 10 ; prochaine étape = analyse d'erreurs par question puis construction d'une recherche hybride BM25 + dense.
+
+
 ### 11 octobre 2026 — chunking de référence figé après analyse d'erreurs BM25
 
 - Analyse des rangs BM25 réalisée sur les trois chunkings.
@@ -519,4 +529,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 11 octobre 2026 — corpus RAG final à 455 documents ; comparaison BM25 terminée, chunking de référence `fixed_300_60` figé ; prochaine étape : dense retrieval / embeddings.*
+*Dernière mise à jour : 11 octobre 2026 — dense retrieval E5 évalué sur 1 357 chunks ; BM25 reste meilleur seul sur le golden set ; prochaine étape : analyse d'erreurs puis recherche hybride BM25 + dense.*
