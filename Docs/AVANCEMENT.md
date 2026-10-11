@@ -300,6 +300,16 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ## 7. Journal chronologique
 
+### 11 octobre 2026 — comparaison BM25 des trois chunkings
+
+- Évaluation BM25 exécutée sur les **18 questions RAG** du golden set avec les trois stratégies de chunking.
+- `fixed_300_60` : **Recall@5 = 1,0000**, **Recall@10 = 1,0000**, **MRR = 0,8306**.
+- `fixed_500_100` : **Recall@5 = 0,8889**, **Recall@10 = 1,0000**, **MRR = 0,7106**.
+- `paragraph_400_80` : **Recall@5 = 1,0000**, **Recall@10 = 1,0000**, **MRR = 0,8074**.
+- Interprétation provisoire : `fixed_300_60` est la meilleure baseline lexicale des trois, avec un rappel parfait à 5/10 et le meilleur MRR. `paragraph_400_80` est très proche ; `fixed_500_100` perd en précision de classement.
+- Le choix final du chunking n'est pas encore figé : prochaine action = analyser les rangs par question et les erreurs de `fixed_500_100`, puis décider si `fixed_300_60` devient le chunking de référence avant le dense retrieval.
+
+
 ### 11 octobre 2026 — trois stratégies de chunking générées
 
 - Le script `src/preprocessing/build_chunks.py` a été exécuté sur les **455 documents** du corpus.
