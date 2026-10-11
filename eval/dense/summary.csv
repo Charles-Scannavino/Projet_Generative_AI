@@ -1,0 +1,2 @@
+model,chunking,questions,chunks,device,embedding_dimension,recall_at_5,recall_at_10,mrr,build_seconds,mean_query_latency_ms
+intfloat/multilingual-e5-small,fixed_300_60,18,1357,mps:0,384,0.9444444444444444,1.0,0.7394179894179894,23.461384333997557,33.3662176668036
