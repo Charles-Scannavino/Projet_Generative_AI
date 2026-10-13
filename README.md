@@ -435,6 +435,123 @@ uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 Le suivi détaillé est maintenu dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
 Les règles, décisions et contraintes durables sont dans [Docs/CONTEXT.md](Docs/CONTEXT.md).
 
+
+## Travail collaboratif avec Git
+
+Le projet est développé à plusieurs. Pour éviter qu'un membre de l'équipe n'écrase involontairement le travail déjà présent sur `main`, **aucun développement ne doit être réalisé directement sur `main`**.
+
+Les branches personnelles de travail sont :
+
+```text
+main
+├── charles
+├── theodore
+├── alexis
+├── robin
+└── gabby
+```
+
+Les noms de branches restent sans accent pour éviter les problèmes de compatibilité dans les commandes Git.
+
+### Règle principale
+
+`main` représente la version commune et stable du projet.
+
+Chaque membre travaille sur sa propre branche, pousse ses modifications sur cette branche, puis ouvre une **Pull Request vers `main`**. Il ne faut pas utiliser `git push origin main` pour envoyer directement du développement sur la branche commune, et il ne faut pas utiliser `git push --force` sur `main`.
+
+### Commencer une session de travail
+
+Avant de commencer une nouvelle tâche, récupérer d'abord la dernière version de `main` :
+
+```bash
+git switch main
+git pull --ff-only origin main
+```
+
+Puis revenir sur sa branche personnelle et y intégrer la dernière version de `main`.
+
+Pour Charles :
+
+```bash
+git switch charles
+git merge main
+```
+
+Pour les autres membres, remplacer `charles` par `theodore`, `alexis`, `robin` ou `gabby`.
+
+Avant de modifier des fichiers, vérifier la branche active :
+
+```bash
+git branch --show-current
+```
+
+La commande doit afficher la branche personnelle du membre, et non `main`.
+
+### Enregistrer son travail
+
+Pendant le développement :
+
+```bash
+git status
+git add .
+git commit -m "Description claire de la modification"
+git push origin charles
+```
+
+Charles utilise `charles`. Les autres membres poussent respectivement vers leur propre branche.
+
+Exemples :
+
+```bash
+git push origin theodore
+git push origin alexis
+git push origin robin
+git push origin gabby
+```
+
+### Intégrer le travail dans main
+
+Une fois une tâche terminée :
+
+1. pousser la branche personnelle sur GitHub ;
+2. ouvrir une **Pull Request** ;
+3. choisir `main` comme branche de destination (*base*) ;
+4. choisir la branche personnelle comme branche source (*compare*) ;
+5. relire les modifications et résoudre les éventuels conflits ;
+6. fusionner la Pull Request seulement lorsque les changements sont validés.
+
+Exemple :
+
+```text
+base:    main
+compare: charles
+```
+
+Après la fusion de la Pull Request, mettre à jour sa copie locale :
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch charles
+git merge main
+```
+
+### Si plusieurs personnes modifient les mêmes fichiers
+
+Git ne remplace pas silencieusement deux versions incompatibles : il peut signaler un **conflit de fusion**. Dans ce cas, ne pas choisir une version au hasard et ne pas forcer le push. Examiner les deux modifications, conserver le contenu nécessaire, tester le projet, puis terminer la fusion.
+
+### Commandes à éviter sur main
+
+Sauf opération volontaire et maîtrisée d'administration du dépôt, ne pas utiliser :
+
+```bash
+git push --force origin main
+git push -f origin main
+git reset --hard origin/main
+```
+
+Un tag de sécurité peut être créé avant une étape importante afin de conserver un point de restauration de l'état du projet.
+
 ## Sécurité et versionnement
 
 - ne jamais committer de clé API ;
