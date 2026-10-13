@@ -530,10 +530,9 @@ uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 
 ## Étapes restantes principales
 
-La fusion hybride RRF, le reranker et `search_docs` sont terminés (voir [Retrieval](#retrieval)). Restent :
-
-1. connecter l'API locale Ollama depuis Python et intégrer `qwen3:4b` au RAG ;
-2. ajouter citations, abstention et sorties validées avec Pydantic ;
+La fusion hybride RRF, le reranker et `search_docs` sont terminés (voir [Retrieval](#retrieval)). Un premier prototype RAG est présent à la fin du [notebook](notebooks/Assistant_HLM_RAG.ipynb) ; son exécution avec Ollama reste à valider. Restent :
+1. exécuter et valider le prototype avec l'API locale Ollama et `qwen3:4b` ;
+2. stabiliser l'intégration RAG côté Python/agent et la couvrir par une évaluation end-to-end ;
 3. intégrer les plafonds HLM et `check_eligibility` ;
 4. intégrer RPLS et `social_housing_stats` ;
 5. intégrer DVF et `market_prices` ;

@@ -7,6 +7,7 @@
 **Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**). ✅ **Retrieval final livré** : `search_docs` = BM25 + dense E5 + fusion **RRF** + reranker **`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`**, évalué sur les **18 questions RAG** (Recall@5 = 1,0000, Recall@10 = 1,0000, MRR = 0,9444, latence p95 = 503 ms/requête sur le MacBook Pro M1) et couvert par **22 tests**. **Ollama** et le modèle local **`qwen3:4b`** (2,5 Go) sont validés sur le **MacBook Pro M1 16 Go**. **Prochaine étape principale : intégrer `qwen3:4b` au pipeline RAG (réponses citées, abstention) et créer `eval/run_eval.py`.**
 
 **Étape en cours :**
+- une première section RAG a été ajoutée au notebook : elle réutilise `search_docs`, appelle l'API locale Ollama et vérifie les citations proposées par le modèle ; l'exécution réelle avec Ollama reste à valider ;
 - le corpus brut Service-Public a été parsé dans Colab ;
 - 3 004 fiches `F*.xml` ont été indexées dans un DataFrame de métadonnées ;
 - 350 fiches rattachées au sujet `Logement` ont été retenues comme **corpus Service-Public de travail** ;
@@ -613,4 +614,13 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Description proposée pour l'outil LLM : « search_docs : cherche dans les fiches Service-Public et les articles du Code de la construction et de l'habitation sur le logement social (demande HLM, Dalo, APL, surloyer, bail…). À utiliser pour toute question sur des droits, démarches ou règles. »
 - Prochaine étape : intégrer `search_docs` au pipeline RAG avec Ollama / `qwen3:4b`, puis ajouter citations, abstention et évaluation end-to-end.
 
-*Dernière mise à jour : 13 octobre 2026 — retrieval final livré et interface `search_docs` documentée ; prochaine étape : intégration Python d'Ollama / `qwen3:4b` et `eval/run_eval.py`.*
+### 13 octobre 2026 — prototype RAG ajouté au notebook
+
+- Les dernières modifications de `origin/main` ont été intégrées à la branche de travail avant l'ajout du notebook.
+- Ajout d'une section RAG en fin de `notebooks/Assistant_HLM_RAG.ipynb`, après l'exploration/préparation Service-Public existante.
+- Le prototype appelle le `search_docs` final du dépôt, envoie les passages récupérés à `qwen3:4b` via l'API HTTP locale Ollama et structure la sortie avec Pydantic.
+- Les identifiants de citations sont contrôlés contre les documents effectivement récupérés ; le prompt traite le texte des sources comme des données, pas comme des instructions, et demande l'abstention lorsque les sources sont insuffisantes.
+- Contrôles effectués : JSON du notebook valide et espaces Git propres. Le modèle Ollama / les modèles de retrieval n'ont pas été lancés depuis cette session ; le test end-to-end reste à faire sur la machine où Ollama est installé.
+- Prochaine action : exécuter les cellules RAG dans l'environnement du dépôt avec Ollama actif, valider citations et abstention, puis extraire le composant stabilisé hors du notebook si nécessaire.
+
+*Dernière mise à jour : 13 octobre 2026 — prototype RAG ajouté au notebook, runtime Ollama à valider ; prochaine étape : test end-to-end puis `eval/run_eval.py`.*
