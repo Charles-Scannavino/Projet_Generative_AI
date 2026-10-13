@@ -51,7 +51,7 @@
 - [x] Décision prise de modulariser ensuite le notebook en fichiers `.py`.
 - [x] Préparer l'environnement local final avec `uv` (`pyproject.toml`, `uv.lock`, Python 3.12.7 vérifié).
 - [x] Vérifier l'exécution locale du projet sur laptop (MacBook Pro Apple Silicon, PyTorch **MPS** opérationnel).
-- [ ] Mettre en place Ollama / modèle local.
+- [x] Mettre en place Ollama / modèle local (`qwen3:4b`, 2,5 Go, MacBook Pro M1 16 Go).
 
 ### Service-Public — corpus brut
 
@@ -310,6 +310,16 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 13 octobre 2026 — Ollama et modèle local validés
+
+- Machine locale confirmée : **MacBook Pro M1, 16 Go de mémoire unifiée** ; Homebrew est installé.
+- Ollama installé et opérationnel ; `ollama list` confirme **`qwen3:4b`** (2,5 Go).
+- Premier test interactif exécuté avec `ollama run qwen3:4b`.
+- Le test sur « DALO » montre que le modèle seul ne connaît pas fiablement ce terme juridique français et produit une réponse erronée : cela confirme la nécessité de fournir les connaissances métier via le **RAG Service-Public + LEGI**, plutôt que de compter sur la mémoire interne du LLM.
+- Le modèle `qwen3:4b` expose un mode de raisonnement (« thinking »), à mesurer séparément car il augmente les tokens et la latence.
+- Prochaine étape LLM : tester l'API locale Ollama depuis le projet Python, puis intégrer le modèle au pipeline RAG après la recherche hybride et le reranker.
+
 
 ### 11 octobre 2026 — dense retrieval versionné et dépôts synchronisés
 
