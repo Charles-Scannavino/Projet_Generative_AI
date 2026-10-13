@@ -1,105 +1,141 @@
 # Projet Generative AI — Assistant HLM RAG & Agent
 
-Projet de groupe du cours **Generative AI I** : construction d'un assistant sur le logement social français combinant **RAG**, **recherche hybride**, **reranking** et **outils déterministes** sur données ouvertes.
+Projet de groupe du cours **Generative AI I** : construction d'un assistant local sur le logement social français combinant **RAG**, **recherche hybride**, **reranking**, **LLM local avec Ollama** et **outils déterministes** sur données ouvertes.
 
 ## Objectif
 
 L'assistant doit pouvoir :
 
 - expliquer les droits et démarches liés au logement social ;
-- répondre à partir de fiches Service-Public et, à terme, de textes LEGI ;
-- vérifier l'éligibilité via des règles et barèmes calculés en Python ;
+- répondre à partir de sources officielles Service-Public et LEGI ;
+- vérifier l'éligibilité à partir de barèmes calculés en Python ;
 - interroger des statistiques communales RPLS ;
 - calculer des indicateurs DVF sur les prix de vente ;
-- citer ses sources ;
-- savoir s'abstenir lorsque les données ne permettent pas de répondre.
+- citer les sources utilisées ;
+- s'abstenir lorsque les données disponibles ne permettent pas de répondre de façon fiable.
 
-## Contraintes du projet
+L'objectif n'est pas seulement d'obtenir une démonstration fonctionnelle : chaque composant important doit être **mesuré** sur un golden set avec qualité, latence, tokens, appels d'outils et coût.
 
-- corpus cible : environ **500 documents** cohérents ;
-- retrieval : **BM25 + dense**, puis **reranking** ;
-- réponses structurées et validées ;
-- exécution locale finale avec un modèle open-weight ;
-- suivi des tokens, de la latence, des appels d'outils et du coût ;
-- évaluation sur un **golden set d'environ 40 questions** ;
-- commande finale attendue :
+## Architecture générale
 
-```bash
-uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
+Le pipeline documentaire cible est :
+
+```text
+Documents Service-Public + LEGI
+        ↓
+Nettoyage / normalisation
+        ↓
+Chunking + métadonnées
+        ↓
+BM25 ─────────────┐
+                  ├── RRF ──> Reranker ──> Top-k chunks
+Dense E5 ─────────┘
+                                ↓
+                         Ollama / Qwen3
+                                ↓
+                   Réponse structurée + citations
 ```
+
+L'architecture agentique cible est :
+
+```text
+Utilisateur
+    ↓
+Agent / LLM local
+    ├── search_docs
+    ├── check_eligibility
+    ├── social_housing_stats
+    └── market_prices
+    ↓
+Réponse structurée + sources + trace des outils
+```
+
+Les calculs réglementaires et statistiques restent déterministes en Python : le LLM orchestre les outils mais ne remplace pas les calculs.
 
 ## État actuel
 
-- corpus Service-Public brut chargé et parsé ;
-- **3 004** fiches `F*.xml` identifiées ;
-- **350** fiches du thème `Logement` retenues comme corpus Service-Public de travail ;
-- filtre HLM strict : **24** fiches ;
-- filtre logement élargi : **505** fiches, avec faux positifs ;
-- golden set actif : **20 questions** ;
-- prochaine étape : extraction et contrôle du texte complet des 350 fiches, puis ajout de LEGI et expérimentation du chunking.
+### Corpus
 
-Le suivi détaillé se trouve dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
-Les règles et décisions durables du projet se trouvent dans [Docs/CONTEXT.md](Docs/CONTEXT.md).
+Le corpus documentaire RAG est finalisé :
 
-## Arborescence
+- **117 documents Service-Public** ;
+- **338 articles LEGI** ;
+- **455 documents** au total ;
+- chunking de référence : **`fixed_300_60`** ;
+- **1 357 chunks** dans le corpus de retrieval.
 
-```text
-Projet_Generative_AI/
-├── README.md
-├── .gitignore
-├── Docs/
-│   ├── CONTEXT.md
-│   ├── AVANCEMENT.md
-│   └── spec/
-├── notebooks/
-│   └── Assistant_HLM_RAG.ipynb
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── indexes/
-├── eval/
-│   ├── golden.jsonl
-│   └── golden_backlog_pending.jsonl
-├── src/
-└── app/
-```
-
-## Données
-
-### Service-Public
-
-Le fichier source actuellement utilisé est :
+Fichier de chunks actuellement utilisé :
 
 ```text
-data/raw/service_public/vosdroits-latest.zip
+data/processed/chunks/fixed_300_60.jsonl
 ```
 
-Dans Colab, les milliers de XML doivent être extraits de préférence dans `/content/` pour éviter les écritures lentes vers Google Drive.
+### Retrieval
 
-### Sources à intégrer
+Deux premières méthodes ont été évaluées sur les **18 questions RAG** du golden set :
 
-- LEGI — Code de la construction et de l'habitation ;
-- RPLS ;
-- DVF ;
-- plafonds PLAI / PLUS / PLS.
+| Méthode | Recall@5 | Recall@10 | MRR |
+|---|---:|---:|---:|
+| BM25 | 1.0000 | 1.0000 | 0.8306 |
+| Dense — `intfloat/multilingual-e5-small` | 0.9444 | 1.0000 | 0.7394 |
 
-## Emplacement local obligatoire
+BM25 est donc meilleur seul sur le golden set actuel. La prochaine étape est la fusion **BM25 + dense par Reciprocal Rank Fusion (RRF)**, puis l'ajout d'un **reranker cross-encoder**.
 
-Pour garantir le bon fonctionnement du notebook sans modification du chemin `PROJECT_PATH`, le dépôt doit être cloné ou déplacé dans l'emplacement suivant sur chaque ordinateur :
+### Modèle génératif local
+
+Le projet utilise désormais **Ollama** pour exécuter un LLM local.
+
+Configuration de référence actuellement validée :
+
+```text
+Machine : MacBook Pro M1
+Mémoire : 16 Go de mémoire unifiée
+Gestionnaire de paquets : Homebrew
+LLM local : qwen3:4b
+Taille du modèle Ollama : 2,5 Go
+```
+
+Un premier test de `qwen3:4b` sans RAG a montré que le modèle ne connaissait pas correctement le terme juridique **DALO**. Ce résultat est volontairement conservé comme baseline : le LLM seul ne doit pas servir de source de vérité. Les connaissances métier doivent être apportées par les documents Service-Public et LEGI récupérés par le RAG.
+
+## Installation locale
+
+### 1. Prérequis
+
+Environnement de référence :
+
+- macOS sur Apple Silicon ;
+- Homebrew ;
+- Python 3.12+ ;
+- `uv` ;
+- Ollama.
+
+Vérifier Homebrew :
+
+```bash
+brew --version
+```
+
+Installer `uv` si nécessaire :
+
+```bash
+brew install uv
+```
+
+Installer Ollama si nécessaire :
+
+```bash
+brew install ollama
+```
+
+### 2. Cloner le repository
+
+Le notebook et plusieurs scripts supposent actuellement que le projet se trouve dans :
 
 ```text
 ~/Documents/Projets/Projet_Generative_AI
 ```
 
-Le notebook utilise volontairement le chemin relatif au dossier personnel :
-
-```python
-PROJECT_PATH = "~/Documents/Projets/Projet_Generative_AI"
-```
-
-Tous les membres du groupe doivent donc conserver exactement cette arborescence locale. Le symbole `~` désigne le dossier personnel de l'utilisateur ; seul le nom d'utilisateur change d'un ordinateur à l'autre.
-
-Pour préparer l'emplacement avant le clonage :
+Préparer l'emplacement puis cloner le dépôt :
 
 ```bash
 mkdir -p ~/Documents/Projets
@@ -108,38 +144,308 @@ git clone https://github.com/Charles-Scannavino/Projet_Generative_AI.git
 cd Projet_Generative_AI
 ```
 
-## Notebook
+Le repository est privé : le compte GitHub utilisé doit avoir accès au projet.
 
-Le notebook de prototypage est :
+### 3. Installer l'environnement Python
 
-```text
-notebooks/Assistant_HLM_RAG.ipynb
+Le projet est géré avec `uv`. Les dépendances sont définies dans `pyproject.toml` et verrouillées dans `uv.lock`.
+
+Depuis la racine du projet :
+
+```bash
+uv sync
 ```
 
-Le notebook sert à explorer et expérimenter. Les composants stabilisés seront ensuite déplacés dans des modules Python sous `src/`.
+Vérifier Python :
+
+```bash
+uv run python --version
+```
+
+L'environnement actuellement validé utilise Python **3.12.7**.
+
+### 4. Démarrer Ollama
+
+Si Ollama a été installé avec Homebrew, il peut être lancé comme service :
+
+```bash
+brew services start ollama
+```
+
+Vérifier qu'Ollama répond :
+
+```bash
+ollama --version
+```
+
+### 5. Télécharger le modèle local
+
+Le modèle de départ retenu est :
+
+```bash
+ollama pull qwen3:4b
+```
+
+Vérifier les modèles installés :
+
+```bash
+ollama list
+```
+
+La configuration validée affiche actuellement :
+
+```text
+qwen3:4b    2.5 GB
+```
+
+### 6. Tester le modèle
+
+Lancer une session interactive :
+
+```bash
+ollama run qwen3:4b
+```
+
+Exemple :
+
+```text
+Explique en français ce qu'est le DALO en trois phrases.
+```
+
+Pour quitter :
+
+```text
+/bye
+```
+
+Qwen3 peut afficher un mode de raisonnement `Thinking...`. Pour les tests documentaires simples, on peut le désactiver dans la session interactive :
+
+```text
+/set nothink
+```
+
+Le mode de raisonnement devra être évalué séparément si nous décidons de l'utiliser, car il augmente le nombre de tokens et la latence.
+
+## Ollama : rôle dans le projet
+
+Ollama **n'est pas un moteur de recherche Web**. Dans notre configuration, il exécute localement `qwen3:4b` sur le Mac.
+
+Lors d'un appel simple :
+
+```bash
+ollama run qwen3:4b
+```
+
+le modèle répond à partir de ses poids et du contexte fourni dans le prompt. Il ne consulte pas automatiquement Internet et il ne lit pas automatiquement notre corpus HLM.
+
+Le RAG sert précisément à apporter les bonnes informations au modèle :
+
+```text
+Question utilisateur
+        ↓
+Retrieval dans le corpus local
+BM25 + dense + RRF + reranker
+        ↓
+Passages Service-Public / LEGI pertinents
+        ↓
+Qwen3:4b via Ollama
+        ↓
+Réponse fondée sur les passages + citations
+```
+
+Ainsi, pour une question sur le DALO, Qwen ne doit pas être utilisé uniquement sur sa mémoire interne : le système récupère d'abord les passages officiels pertinents puis les injecte dans son contexte.
+
+## Arborescence utile
+
+```text
+Projet_Generative_AI/
+├── README.md
+├── pyproject.toml
+├── uv.lock
+├── Docs/
+│   ├── CONTEXT.md
+│   ├── AVANCEMENT.md
+│   └── spec/
+├── notebooks/
+│   └── Assistant_HLM_RAG.ipynb
+├── data/
+│   ├── raw/
+│   │   ├── service_public/
+│   │   ├── legi/
+│   │   ├── rpls/
+│   │   ├── dvf/
+│   │   └── plafonds/
+│   ├── processed/
+│   │   ├── service_public_hlm_documents.jsonl
+│   │   ├── legi_hlm_documents.jsonl
+│   │   ├── rag_documents.jsonl
+│   │   └── chunks/
+│   │       └── fixed_300_60.jsonl
+│   └── indexes/
+├── src/
+│   ├── ingestion/
+│   ├── preprocessing/
+│   ├── retrieval/
+│   ├── tools/
+│   └── agent/
+├── eval/
+│   ├── golden.jsonl
+│   ├── golden_backlog_pending.jsonl
+│   ├── eval_bm25_chunking.py
+│   └── eval_dense.py
+└── app/
+```
+
+## Code Python principal
+
+### Ingestion
+
+```text
+src/ingestion/service_public.py
+src/ingestion/legi.py
+```
+
+Ces modules lisent et normalisent les sources documentaires.
+
+### Prétraitement
+
+```text
+src/preprocessing/build_service_public_hlm_corpus.py
+src/preprocessing/build_legi_hlm_corpus.py
+src/preprocessing/build_rag_corpus.py
+src/preprocessing/build_chunks.py
+```
+
+Ils construisent les corpus finaux et les différentes stratégies de chunking.
+
+### Retrieval
+
+```text
+src/retrieval/dense.py
+```
+
+Le retriever dense utilise actuellement :
+
+```text
+intfloat/multilingual-e5-small
+```
+
+avec des embeddings de **384 dimensions**. Sur le MacBook Pro M1, PyTorch utilise **MPS**.
+
+Les prochains modules prévus sont notamment :
+
+```text
+src/retrieval/bm25.py
+src/retrieval/hybrid.py
+src/retrieval/reranker.py
+```
+
+## Données
+
+### Données brutes
+
+```text
+data/raw/
+```
+
+Le ZIP Service-Public versionné est :
+
+```text
+data/raw/service_public/vosdroits-latest.zip
+```
+
+Les fichiers bruts volumineux LEGI, RPLS et DVF ne doivent pas nécessairement être versionnés dans Git.
+
+### Données traitées
+
+Les fichiers principaux sont :
+
+```text
+data/processed/service_public_hlm_documents.jsonl
+data/processed/legi_hlm_documents.jsonl
+data/processed/rag_documents.jsonl
+data/processed/chunks/fixed_300_60.jsonl
+```
+
+`rag_documents.jsonl` contient les **455 documents** avant chunking.
+
+`fixed_300_60.jsonl` contient les **1 357 chunks** actuellement utilisés pour l'évaluation du retrieval.
 
 ## Évaluation
 
-`eval/golden.jsonl` contient actuellement 20 questions actives :
+Le golden set actif est :
 
-- 18 questions RAG ;
-- 1 question hors périmètre ;
-- 1 prompt injection.
+```text
+eval/golden.jsonl
+```
 
-Les questions dépendant de données non encore intégrées sont conservées dans :
+Il contient actuellement :
+
+- **18 questions RAG** ;
+- **1 question hors périmètre** ;
+- **1 prompt injection**.
+
+Les futurs cas d'éligibilité, RPLS et DVF sont conservés dans :
 
 ```text
 eval/golden_backlog_pending.jsonl
 ```
 
+Évaluations déjà disponibles :
+
+```bash
+uv run python eval/eval_bm25_chunking.py
+uv run python eval/eval_dense.py
+```
+
+La commande finale prévue par l'énoncé sera :
+
+```bash
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
+```
+
+**Attention : `eval/run_eval.py` n'est pas encore implémenté à ce stade.**
+
+À terme, l'évaluation finale doit enregistrer par question au minimum :
+
+- réponse ;
+- sources citées ;
+- documents récupérés ;
+- tokens en entrée/sortie ;
+- latence ;
+- appels d'outils ;
+- raison d'arrêt / abstention ;
+- coût.
+
+## Étapes restantes principales
+
+1. implémenter la fusion hybride BM25 + dense avec **RRF** ;
+2. ajouter un **reranker cross-encoder** ;
+3. créer `search_docs` ;
+4. connecter l'API locale Ollama depuis Python et intégrer `qwen3:4b` au RAG ;
+5. ajouter citations, abstention et sorties validées avec Pydantic ;
+6. intégrer les plafonds HLM et `check_eligibility` ;
+7. intégrer RPLS et `social_housing_stats` ;
+8. intégrer DVF et `market_prices` ;
+9. construire l'agent et mesurer le routage des outils ;
+10. étendre le golden set vers environ 40 questions ;
+11. créer `eval/run_eval.py` et l'évaluation finale ;
+12. préparer la démonstration et le tag `v1.0`.
+
+Le suivi détaillé est maintenu dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
+Les règles, décisions et contraintes durables sont dans [Docs/CONTEXT.md](Docs/CONTEXT.md).
+
 ## Sécurité et versionnement
 
 - ne jamais committer de clé API ;
-- utiliser un fichier .env local et .gitignore ;
-- ne pas committer les XML extraits, caches de modèles, index vectoriels ou résultats volumineux ;
-- les versions exactes des modèles seront ajoutées au README lorsqu'elles seront figées.
+- utiliser un fichier `.env` local et git-ignoré lorsque nécessaire ;
+- fournir un `.env.example` avant la livraison finale ;
+- ne pas committer les caches de modèles ou index lourds ;
+- considérer les documents récupérés par le RAG comme des **données**, jamais comme des instructions ;
+- valider les arguments des futurs appels d'outils avant exécution ;
+- mesurer les cas de prompt injection et les stratégies d'abstention.
 
 ## Échéances
 
 - **Code freeze** : 20 octobre 2026 à 23 h 59 — tag `v1.0`
-- **Soutenance** : 21 octobre 2026 — 10 min de pitch + 5 min de questions
+- **Soutenance** : 21 octobre 2026 — 10 minutes de pitch + 5 minutes de questions
