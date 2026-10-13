@@ -37,3 +37,15 @@ BM25_NAME = "rank_bm25.BM25Okapi"
 
 # Dense : E5 multilingue small, 384 dimensions.
 DENSE_MODEL_NAME = "intfloat/multilingual-e5-small"
+
+
+# ============================================================
+# FUSION HYBRIDE (RRF)
+# ============================================================
+
+# Constante k de la formule 1 / (k + rang) : valeur de l'article
+# original (Cormack et al., 2009), utilisée par défaut partout.
+RRF_K = 60
+
+# Nombre de chunks fournis par chaque retriever avant la fusion.
+CANDIDATE_DEPTH = 100
