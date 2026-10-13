@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**), baseline **BM25** et dense retrieval **E5** évalués sur les **18 questions RAG** du golden set. **Ollama** est maintenant installé et le modèle local **`qwen3:4b`** (2,5 Go) a été validé sur le **MacBook Pro M1 16 Go**. BM25 reste meilleur seul à ce stade. **Prochaine étape principale : recherche hybride BM25 + dense avec fusion RRF, puis reranker.**
+**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**). ✅ **Retrieval final livré** : `search_docs` = BM25 + dense E5 + fusion **RRF** + reranker **`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`**, évalué sur les **18 questions RAG** (Recall@5 = 1,0000, Recall@10 = 1,0000, MRR = 0,9444, latence p95 = 503 ms/requête sur le MacBook Pro M1) et couvert par **22 tests**. **Ollama** et le modèle local **`qwen3:4b`** (2,5 Go) sont validés sur le **MacBook Pro M1 16 Go**. **Prochaine étape principale : intégrer `qwen3:4b` au pipeline RAG (réponses citées, abstention) et créer `eval/run_eval.py`.**
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -25,7 +25,8 @@
 - corpus Service-Public HLM final généré : **117 KEEP**, **233 EXCLUDE**, **0 REVIEW** ;
 - contrôles finaux validés : **0 document vide**, **0 doublon**, **15/15 `gold_docs` présents**, aucun `gold_doc` manquant ;
 - fichiers générés : `data/processed/service_public_hlm_documents.jsonl` et `data/processed/service_public_scope_decisions_final.csv` ;
-- étape actuelle : construire et évaluer la **recherche hybride BM25 + dense**, puis ajouter un reranker.
+- retrieval final livré le 13 octobre 2026 (hybride RRF + reranker, `search_docs`, ablation des 5 méthodes, 22 tests) ;
+- étape actuelle : intégrer Ollama / `qwen3:4b` au pipeline RAG, puis créer `eval/run_eval.py`.
 
 **Échéances :**
 - gel du code : **20 octobre 2026 à 23 h 59** ;
@@ -127,10 +128,10 @@
 - [x] Implémenter le dense retrieval.
 - [x] Choisir et documenter le modèle d'embedding : `intfloat/multilingual-e5-small` (**384 dimensions**), exécuté via `sentence-transformers` sur **MPS**.
 - [x] Comparer dense et BM25.
-- [ ] Implémenter la fusion hybride.
-- [ ] Tester une méthode de fusion, en priorité **RRF (Reciprocal Rank Fusion)**.
-- [ ] Ajouter un reranker.
-- [ ] Comparer :
+- [x] Implémenter la fusion hybride (`src/retrieval/hybrid.py`).
+- [x] Tester une méthode de fusion, en priorité **RRF (Reciprocal Rank Fusion)** : k = 60, 100 candidats par retriever.
+- [x] Ajouter un reranker (`src/retrieval/reranker.py`) : `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` retenu, `BAAI/bge-reranker-v2-m3` comparé.
+- [x] Comparer (`eval/eval_retrieval.py`, résultats dans `eval/retrieval/`) :
   - BM25 ;
   - dense ;
   - hybride ;
@@ -140,7 +141,7 @@
 
 ### RAG / génération
 
-- [ ] Construire `search_docs`.
+- [x] Construire `search_docs` (`src/retrieval/search.py`, contrat Pydantic dans `src/retrieval/schemas.py`, 22 tests dans `tests/test_retrieval.py`).
 - [x] Installer et valider le modèle génératif local via Ollama : **`qwen3:4b`**.
 - [ ] Intégrer Ollama / `qwen3:4b` au pipeline Python du RAG.
 - [ ] Produire des réponses fondées uniquement sur les sources récupérées.
@@ -281,32 +282,25 @@ Puis traiter localement les XML et ne sauvegarder sur Drive que les résultats u
 
 ## 5. Prochaine action immédiate
 
-Le corpus documentaire, le chunking de référence et les deux premiers retrievers sont maintenant opérationnels et versionnés.
+Le retrieval est terminé : `search_docs` (BM25 + dense + RRF + reranker) est implémenté, évalué, testé et documenté.
 
-État expérimental actuel sur les **18 questions RAG** du golden set :
+Ablation finale sur les **18 questions RAG** du golden set (chunking `fixed_300_60`, métriques au niveau document, latence par requête sur MacBook Pro M1 / MPS) :
 
 ```text
-BM25 — fixed_300_60
-Recall@5  : 1.0000
-Recall@10 : 1.0000
-MRR       : 0.8306
-
-Dense — intfloat/multilingual-e5-small
-Recall@5  : 0.9444
-Recall@10 : 1.0000
-MRR       : 0.7394
+Méthode                 R@1     R@5     R@10    MRR     p95/requête
+BM25                    0.6944  1.0000  1.0000  0.8306      3 ms
+Dense E5                0.5833  0.9444  1.0000  0.7394     13 ms
+Hybride RRF             0.7500  0.9444  1.0000  0.8524     11 ms
+Hybride + MiniLM        0.8611  1.0000  1.0000  0.9444    503 ms   <- configuration par défaut
+Hybride + bge           0.9167  1.0000  1.0000  0.9722   4428 ms
 ```
 
-Le dense E5 seul est donc moins performant que BM25 sur ce golden set, mais il conserve un rappel parfait à 10. L'analyse d'erreurs montre notamment que **q006 / F21051** n'apparaît qu'au rang 7 en dense, tandis que plusieurs questions APL/ALF/ALS et juridiques font remonter des documents sémantiquement proches avant le document attendu.
+Prochaines étapes :
 
-La prochaine étape est la **recherche hybride BM25 + dense** :
-
-1. produire les classements BM25 et dense sur le même chunking `fixed_300_60` ;
-2. fusionner les rangs avec **RRF** afin d'éviter de mélanger directement des scores de nature différente ;
-3. mesurer `Recall@5`, `Recall@10` et `MRR` sur les mêmes 18 questions ;
-4. comparer les erreurs de BM25, dense et hybride ;
-5. conserver la meilleure configuration avant d'ajouter un **reranker** ;
-6. tester ensuite l'API locale Ollama depuis Python et intégrer `qwen3:4b` au pipeline RAG avec citations structurées.
+1. tester l'API locale Ollama depuis Python ;
+2. brancher `search_docs` sur `qwen3:4b` : réponse fondée uniquement sur les passages récupérés, citations (`document_id`, `url`), abstention si les passages sont insuffisants ;
+3. créer `eval/run_eval.py` en enregistrant `SearchResponse.document_ids` comme documents récupérés ;
+4. vérifier sur q020 que les passages restent traités comme des données et non comme des instructions.
 
 Le code dense et ses résultats sont versionnés. Depuis le nettoyage d'historique du 13 octobre, le dépôt principal et le dépôt `review` conservent volontairement **des historiques Git différents** : le dépôt principal utilise l'historique nettoyé, tandis que `review` conserve l'historique d'origine. L'objectif est de maintenir **le même contenu fonctionnel** dans les deux dépôts sans force-push de l'un vers l'autre.
 
@@ -325,6 +319,32 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 13 octobre 2026 — retrieval final : hybride RRF + reranker, `search_docs`
+
+- Socle commun créé : `src/retrieval/config.py` (toute la configuration), `common.py`, `bm25.py` (`BM25Retriever`, tokenisation identique à `eval_bm25_chunking.py`) et `eval/metrics.py` (chunks → documents, Recall@1/5/10, Hit@1, MRR).
+- Cache des embeddings denses dans `data/indexes/` (`.npy` + JSON : modèle, nombre de chunks, SHA-256 du fichier de chunks ; reconstruit automatiquement si l'un change ; ignoré par Git) : calcul **17,9 s**, rechargement **0,01 s**, embeddings identiques au bit près.
+- Non-régression validée : BM25 **1,0000 / 1,0000 / 0,8306** et dense E5 **0,9444 / 1,0000 / 0,7394** (R@5 / R@10 / MRR), avec des rangs par question identiques aux anciens CSV.
+- Hybride (`src/retrieval/hybrid.py`) : RRF au niveau des chunks, score = Σ 1/(60 + rang), 100 candidats par retriever ; `bm25_rank`, `dense_rank` et `rrf_score` sont conservés pour la traçabilité.
+- Reranker (`src/retrieval/reranker.py`) : cross-encoder appliqué aux 30 premiers candidats, entrée (question, `retrieval_text`), MPS, `max_length` 512 (pour q001, 178 paires sur 1 357, soit 13 %, dépassent 512 tokens et sont tronquées). Modèles comparés : `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` (118 M paramètres, 471 Mo) et `BAAI/bge-reranker-v2-m3` (568 M paramètres, 2 271 Mo).
+- Ablation `eval/eval_retrieval.py` → `eval/retrieval/summary.csv` et `eval/retrieval/details.csv` :
+
+  | Méthode | R@1 | R@5 | R@10 | MRR | Latence moy. | p95 | Chargement |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | BM25 | 0,6944 | 1,0000 | 1,0000 | 0,8306 | 2,3 ms | 3,1 ms | 0,10 s |
+  | Dense E5 | 0,5833 | 0,9444 | 1,0000 | 0,7394 | 9,5 ms | 12,9 ms | 3,94 s |
+  | Hybride RRF | 0,7500 | 0,9444 | 1,0000 | 0,8524 | 10,5 ms | 11,3 ms | 4,04 s |
+  | Hybride + MiniLM | 0,8611 | 1,0000 | 1,0000 | 0,9444 | 452,4 ms | 502,7 ms | 6,74 s |
+  | Hybride + bge | 0,9167 | 1,0000 | 1,0000 | 0,9722 | 4 281,7 ms | 4 427,8 ms | 8,99 s |
+
+- 9 questions sur 18 ont un rang différent selon la méthode. L'hybride seul améliore le MRR de BM25 (0,8306 → 0,8524) mais fait sortir **q006 / F21051** du top 5 (rang 7, comme le dense) ; les deux rerankers la remettent au rang 1. Avec MiniLM, deux questions restent au rang 2 : q005 (F869) et q013 (F31864) ; avec bge, seulement q013.
+- Choix selon la règle fixée avant l'expérience : bge a le meilleur MRR (écart +0,0278, au-dessus du seuil de bruit de 0,02), mais sa latence p95 (**4 428 ms**) dépasse 2 s sur le Mac → **MiniLM retenu par défaut** (MRR 0,9444, p95 503 ms). bge reste activable via `DEFAULT_RERANKER` dans `config.py`.
+- Interface `search_docs(query, k=5, source=None, rerank=True) -> SearchResponse` (Pydantic v2, `src/retrieval/search.py` et `schemas.py`) : chargement unique (lazy singleton) et `warmup()`, filtre `source` appliqué avant la coupe à k, textes renvoyés signalés comme des données. Démonstration : `uv run python -m src.retrieval.search "Comment faire un recours Dalo ?"` (chargement 7,6 s, requête 694 ms).
+- Tests `tests/test_retrieval.py` : **22 tests passés** (`uv run pytest -q`, 21 s).
+- Environnement : `uv` a recréé `.venv` avec **Python 3.14.4** (aucun `.python-version` dans le dépôt), PyTorch 2.14.1 et sentence-transformers 6.1.0, MPS disponible ; les résultats BM25 et dense sont inchangés. Premier téléchargement des deux rerankers : environ 17 min.
+- Limites : 18 questions seulement (une question pèse 0,056 sur le Hit@1) ; aucune optimisation d'hyperparamètres (valeurs standard) ; latences mesurées sur un seul passage de l'évaluation.
+- Prochaine action : intégrer `qwen3:4b` via Ollama et créer `eval/run_eval.py`.
+
 
 ### 13 octobre 2026 — Ollama et modèle local validés
 
@@ -576,4 +596,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 13 octobre 2026 — MacBook Pro M1 16 Go et Homebrew confirmés ; Ollama + `qwen3:4b` validés localement ; test sans RAG documenté ; prochaine étape : hybride BM25 + dense par RRF, puis reranker et intégration Python d'Ollama.*
+*Dernière mise à jour : 13 octobre 2026 — retrieval final livré : BM25 + dense + RRF + reranker MiniLM, ablation des 5 méthodes, `search_docs` et 22 tests ; prochaine étape : intégration Python d'Ollama / `qwen3:4b` et `eval/run_eval.py`.*

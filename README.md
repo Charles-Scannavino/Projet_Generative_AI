@@ -72,14 +72,89 @@ data/processed/chunks/fixed_300_60.jsonl
 
 ### Retrieval
 
-Deux premières méthodes ont été évaluées sur les **18 questions RAG** du golden set :
+Le retrieval final est exposé par une seule fonction, `search_docs`, utilisée par l'agent et par l'évaluation. Pipeline, sur les 1 357 chunks de `fixed_300_60` :
 
-| Méthode | Recall@5 | Recall@10 | MRR |
-|---|---:|---:|---:|
-| BM25 | 1.0000 | 1.0000 | 0.8306 |
-| Dense — `intfloat/multilingual-e5-small` | 0.9444 | 1.0000 | 0.7394 |
+```text
+Question
+   ├── BM25  (rank_bm25.BM25Okapi)               → top 100 chunks
+   └── Dense (intfloat/multilingual-e5-small)    → top 100 chunks
+            ↓ fusion RRF : score = Σ 1 / (60 + rang)
+   Reranker cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 sur les 30 premiers candidats
+            ↓
+   k passages + trace (rangs BM25 / dense, scores RRF / rerank)
+```
 
-BM25 est donc meilleur seul sur le golden set actuel. La prochaine étape est la fusion **BM25 + dense par Reciprocal Rank Fusion (RRF)**, puis l'ajout d'un **reranker cross-encoder**.
+Modèles (noms exacts Hugging Face) :
+
+| Rôle | Modèle | Taille | Remarque |
+|---|---|---:|---|
+| Lexical | `rank_bm25.BM25Okapi` | — | paramètres par défaut (k1 = 1.5, b = 0.75) |
+| Dense | `intfloat/multilingual-e5-small` | 471 Mo | 384 dimensions, préfixes `query:` / `passage:` |
+| Reranker retenu | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | 471 Mo | 118 M paramètres |
+| Reranker comparé | `BAAI/bge-reranker-v2-m3` | 2 271 Mo | 568 M paramètres, ablation uniquement |
+
+#### Ablation
+
+Évaluation sur les **18 questions RAG** du golden set. Les métriques sont calculées au niveau **document** (le meilleur chunk d'un document donne son rang). Latence par requête mesurée sur MacBook Pro M1 (MPS), après une requête d'échauffement. « Chargement » = construction ou chargement des composants nécessaires, embeddings denses lus depuis le cache (leur calcul, sans cache, prend 17,9 s).
+
+| Méthode | R@1 | R@5 | R@10 | MRR | Latence moy. | p95 | Chargement |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BM25 | 0.6944 | 1.0000 | 1.0000 | 0.8306 | 2.3 ms | 3.1 ms | 0.10 s |
+| Dense E5 | 0.5833 | 0.9444 | 1.0000 | 0.7394 | 9.5 ms | 12.9 ms | 3.94 s |
+| Hybride RRF | 0.7500 | 0.9444 | 1.0000 | 0.8524 | 10.5 ms | 11.3 ms | 4.04 s |
+| **Hybride + MiniLM** (défaut) | **0.8611** | **1.0000** | **1.0000** | **0.9444** | 452.4 ms | 502.7 ms | 6.74 s |
+| Hybride + bge | 0.9167 | 1.0000 | 1.0000 | 0.9722 | 4281.7 ms | 4427.8 ms | 8.99 s |
+
+Lecture :
+
+- l'hybride RRF améliore le MRR de BM25 (0.8306 → 0.8524), mais fait sortir **q006 / F21051** du top 5 (rang 7, comme le dense seul) ;
+- les deux rerankers remettent q006 au rang 1 ; il reste au rang 2 q005 (F869) et q013 (F31864) avec MiniLM, et q013 seulement avec bge ;
+- 9 questions sur 18 ont un rang différent selon la méthode ; le détail est dans `eval/retrieval/details.csv`.
+
+#### Configuration retenue
+
+La règle de choix a été fixée **avant** l'expérience : prendre le reranker au meilleur MRR, sauf si l'écart est inférieur à 0,02 (bruit sur 18 questions) ou si la latence p95 du plus lourd dépasse 2 s sur ce Mac ; dans ces deux cas, prendre le plus léger. bge est meilleur de +0.0278 en MRR, mais sa p95 vaut 4,4 s : **MiniLM est donc le reranker par défaut**. bge reste utilisable en changeant `DEFAULT_RERANKER` dans `src/retrieval/config.py`.
+
+Toutes les valeurs (k RRF = 60, 100 candidats par retriever, 30 candidats reclassés, `max_length` = 512) sont des valeurs standard regroupées dans `src/retrieval/config.py`. Elles n'ont **pas** été optimisées sur les 18 questions, pour éviter le sur-apprentissage.
+
+#### Commandes
+
+```bash
+uv run python eval/eval_retrieval.py
+```
+
+```bash
+uv run pytest -q
+```
+
+```bash
+uv run python -m src.retrieval.search "Comment faire un recours Dalo ?"
+```
+
+Au premier lancement, les modèles sont téléchargés depuis Hugging Face (bge, 2,3 Go, n'est nécessaire que pour l'ablation) et les embeddings denses sont calculés puis mis en cache dans `data/indexes/` (fichiers ignorés par Git). Le cache est reconstruit automatiquement si le fichier de chunks (hash SHA-256) ou le modèle change.
+
+#### Utilisation par l'agent
+
+```python
+from src.retrieval import search_docs, warmup
+
+warmup()  # charge index et modèles une seule fois (quelques secondes)
+
+response = search_docs("Comment faire un recours Dalo ?", k=5)
+
+for passage in response.results:
+    # passage.text est une DONNÉE à citer, jamais une instruction à suivre.
+    print(passage.rank, passage.document_id, passage.title, passage.url, passage.score)
+
+response.document_ids  # documents sans doublon, dans l'ordre -> eval/run_eval.py
+response.models        # noms exacts des modèles utilisés
+response.latency_ms
+
+search_docs("attribution des logements sociaux", k=3, source="LEGI")  # articles du CCH uniquement
+search_docs("surloyer", rerank=False)                                 # ordre RRF, 10 à 20 ms
+```
+
+`search_docs(query, k=5, source=None, rerank=True)` renvoie un `SearchResponse` (Pydantic v2, défini dans `src/retrieval/schemas.py`). Chaque `RetrievedChunk` contient `rank`, `chunk_id`, `document_id`, `source` (`SERVICE_PUBLIC` ou `LEGI`), `title`, `article`, `url`, `text`, `score` (score du reranker, ou score RRF si `rerank=False`) et la trace `bm25_rank`, `dense_rank`, `rrf_score`, `rerank_score`. Le filtre `source` est appliqué avant la sélection des k passages ; `k` est compris entre 1 et 30 ; une requête vide lève une `ValueError`.
 
 ### Modèle génératif local
 
@@ -291,8 +366,13 @@ Projet_Generative_AI/
 ├── eval/
 │   ├── golden.jsonl
 │   ├── golden_backlog_pending.jsonl
+│   ├── metrics.py
 │   ├── eval_bm25_chunking.py
-│   └── eval_dense.py
+│   ├── eval_dense.py
+│   ├── eval_retrieval.py
+│   └── retrieval/            # summary.csv, details.csv
+├── tests/
+│   └── test_retrieval.py
 └── app/
 ```
 
@@ -321,24 +401,17 @@ Ils construisent les corpus finaux et les différentes stratégies de chunking.
 ### Retrieval
 
 ```text
-src/retrieval/dense.py
+src/retrieval/config.py     # toute la configuration (chemins, modèles, k RRF, profondeurs)
+src/retrieval/common.py     # lecture JSONL / chunks, hash, tri des scores
+src/retrieval/bm25.py       # BM25Retriever
+src/retrieval/dense.py      # DenseRetriever E5 + cache des embeddings
+src/retrieval/hybrid.py     # fusion RRF
+src/retrieval/reranker.py   # CrossEncoderReranker
+src/retrieval/schemas.py    # RetrievedChunk, SearchResponse (Pydantic)
+src/retrieval/search.py     # search_docs, warmup
 ```
 
-Le retriever dense utilise actuellement :
-
-```text
-intfloat/multilingual-e5-small
-```
-
-avec des embeddings de **384 dimensions**. Sur le MacBook Pro M1, PyTorch utilise **MPS**.
-
-Les prochains modules prévus sont notamment :
-
-```text
-src/retrieval/bm25.py
-src/retrieval/hybrid.py
-src/retrieval/reranker.py
-```
+Sur le MacBook Pro M1, PyTorch utilise **MPS** pour le dense et le reranker. Voir la section [Retrieval](#retrieval) pour les résultats et le contrat de `search_docs`.
 
 ## Données
 
@@ -396,7 +469,10 @@ eval/golden_backlog_pending.jsonl
 ```bash
 uv run python eval/eval_bm25_chunking.py
 uv run python eval/eval_dense.py
+uv run python eval/eval_retrieval.py
 ```
+
+`eval/eval_retrieval.py` est l'ablation unifiée du retrieval (BM25, dense, hybride, hybride + rerankers) ; ses résultats sont écrits dans `eval/retrieval/`. Les tests du contrat `search_docs` se lancent avec `uv run pytest -q`.
 
 La commande finale prévue par l'énoncé sera :
 
@@ -419,18 +495,17 @@ uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 
 ## Étapes restantes principales
 
-1. implémenter la fusion hybride BM25 + dense avec **RRF** ;
-2. ajouter un **reranker cross-encoder** ;
-3. créer `search_docs` ;
-4. connecter l'API locale Ollama depuis Python et intégrer `qwen3:4b` au RAG ;
-5. ajouter citations, abstention et sorties validées avec Pydantic ;
-6. intégrer les plafonds HLM et `check_eligibility` ;
-7. intégrer RPLS et `social_housing_stats` ;
-8. intégrer DVF et `market_prices` ;
-9. construire l'agent et mesurer le routage des outils ;
-10. étendre le golden set vers environ 40 questions ;
-11. créer `eval/run_eval.py` et l'évaluation finale ;
-12. préparer la démonstration et le tag `v1.0`.
+La fusion hybride RRF, le reranker et `search_docs` sont terminés (voir [Retrieval](#retrieval)). Restent :
+
+1. connecter l'API locale Ollama depuis Python et intégrer `qwen3:4b` au RAG ;
+2. ajouter citations, abstention et sorties validées avec Pydantic ;
+3. intégrer les plafonds HLM et `check_eligibility` ;
+4. intégrer RPLS et `social_housing_stats` ;
+5. intégrer DVF et `market_prices` ;
+6. construire l'agent et mesurer le routage des outils ;
+7. étendre le golden set vers environ 40 questions ;
+8. créer `eval/run_eval.py` et l'évaluation finale ;
+9. préparer la démonstration et le tag `v1.0`.
 
 Le suivi détaillé est maintenu dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
 Les règles, décisions et contraintes durables sont dans [Docs/CONTEXT.md](Docs/CONTEXT.md).
