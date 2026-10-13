@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+from src.retrieval.common import (
+    INDEX_DIR,
+    rank_indices,
+    sha256_file,
+)
+from src.retrieval.config import DENSE_MODEL_NAME
 
-DEFAULT_MODEL_NAME = "intfloat/multilingual-e5-small"
+
+DEFAULT_MODEL_NAME = DENSE_MODEL_NAME
 
 
 @dataclass
@@ -71,12 +80,108 @@ class DenseRetriever:
             show_progress_bar=show_progress_bar,
         )
 
-    def search(
-        self,
-        query: str,
-        top_k: int = 10,
-    ) -> list[DenseSearchResult]:
+    # ========================================================
+    # CACHE DES EMBEDDINGS
+    #
+    # Encoder les 1 357 chunks prend ~20 s : on sauvegarde les
+    # embeddings dans data/indexes/ (.npy) avec un fichier JSON
+    # de métadonnées. Le cache n'est réutilisé que si le modèle,
+    # le nombre de chunks ET le hash SHA-256 du fichier de chunks
+    # sont identiques ; sinon l'index est reconstruit.
+    # ========================================================
 
+    def cache_paths(
+        self,
+        chunks_path: Path,
+        cache_dir: Path = INDEX_DIR,
+    ) -> tuple[Path, Path]:
+        model_slug = self.model_name.replace("/", "__")
+        stem = f"dense__{Path(chunks_path).stem}__{model_slug}"
+
+        return (
+            Path(cache_dir) / f"{stem}.npy",
+            Path(cache_dir) / f"{stem}.json",
+        )
+
+    def load_or_build(
+        self,
+        chunks: list[dict],
+        chunks_path: Path,
+        cache_dir: Path = INDEX_DIR,
+        batch_size: int = 32,
+        show_progress_bar: bool = True,
+    ) -> bool:
+        """Charge les embeddings depuis le cache, ou les calcule.
+
+        `chunks` doit avoir été lu depuis `chunks_path`.
+        Renvoie True si le cache a été utilisé, False sinon.
+        """
+        npy_path, meta_path = self.cache_paths(
+            chunks_path,
+            cache_dir,
+        )
+
+        expected = {
+            "model_name": self.model_name,
+            "n_chunks": len(chunks),
+            "chunks_sha256": sha256_file(chunks_path),
+        }
+
+        if npy_path.exists() and meta_path.exists():
+            stored = json.loads(
+                meta_path.read_text(encoding="utf-8")
+            )
+
+            if all(
+                stored.get(key) == value
+                for key, value in expected.items()
+            ):
+                embeddings = np.load(npy_path)
+
+                if embeddings.shape == (
+                    len(chunks),
+                    self.embedding_dimension,
+                ):
+                    self.chunks = chunks
+                    self.embeddings = embeddings
+                    return True
+
+        self.build(
+            chunks,
+            batch_size=batch_size,
+            show_progress_bar=show_progress_bar,
+        )
+
+        Path(cache_dir).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        np.save(npy_path, self.embeddings)
+
+        # Les métadonnées sont écrites en dernier : si l'écriture
+        # est interrompue, le cache sera simplement reconstruit.
+        meta = {
+            **expected,
+            "chunks_file": Path(chunks_path).name,
+            "embedding_dimension": self.embedding_dimension,
+            "normalized": True,
+            "passage_prefix": "passage: ",
+        }
+
+        meta_path.write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        return False
+
+    # ========================================================
+    # RECHERCHE
+    # ========================================================
+
+    def scores(self, query: str) -> np.ndarray:
+        """Similarité cosinus entre la question et chaque chunk."""
         if self.embeddings is None:
             raise RuntimeError(
                 "L'index dense n'a pas encore été construit."
@@ -91,17 +196,31 @@ class DenseRetriever:
 
         # Les embeddings étant normalisés,
         # le produit scalaire = similarité cosinus.
-        scores = self.embeddings @ query_embedding
+        return self.embeddings @ query_embedding
 
-        top_indices = np.argsort(
-            -scores,
-            kind="stable",
-        )[:top_k]
+    def rank(
+        self,
+        query: str,
+        top_k: int | None = None,
+        allowed: np.ndarray | None = None,
+    ) -> list[tuple[int, float]]:
+        """Couples (indice du chunk, score cosinus), du meilleur au moins bon."""
+        return rank_indices(
+            self.scores(query),
+            top_k=top_k,
+            allowed=allowed,
+        )
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 10,
+    ) -> list[DenseSearchResult]:
 
         results = []
 
-        for index in top_indices:
-            chunk = self.chunks[int(index)]
+        for index, score in self.rank(query, top_k=top_k):
+            chunk = self.chunks[index]
 
             results.append(
                 DenseSearchResult(
@@ -112,9 +231,7 @@ class DenseRetriever:
                     title=str(
                         chunk.get("title", "")
                     ),
-                    score=float(
-                        scores[int(index)]
-                    ),
+                    score=score,
                     text=str(
                         chunk.get("text", "")
                     ),
