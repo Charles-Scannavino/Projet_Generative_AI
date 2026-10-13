@@ -49,3 +49,22 @@ RRF_K = 60
 
 # Nombre de chunks fournis par chaque retriever avant la fusion.
 CANDIDATE_DEPTH = 100
+
+
+# ============================================================
+# RERANKER (CROSS-ENCODER)
+# ============================================================
+
+# Deux cross-encoders multilingues comparés à l'étape d'ablation.
+RERANKER_MODELS = {
+    # Léger : MiniLM multilingue entraîné sur mMARCO (MS MARCO traduit).
+    "minilm": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    # Plus précis et plus lourd : base XLM-RoBERTa large (bge-m3).
+    "bge": "BAAI/bge-reranker-v2-m3",
+}
+
+# Nombre de candidats de l'hybride reclassés par le cross-encoder.
+RERANK_TOP_N = 30
+
+# Longueur maximale (en tokens) de la paire (question, chunk).
+RERANKER_MAX_LENGTH = 512
