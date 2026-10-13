@@ -202,6 +202,8 @@ Ablations attendues :
 - **GitHub est désormais la source de vérité** pour le code, le notebook, la documentation et les fichiers d'évaluation.
 - Google Drive / le stockage local restent utilisés pour les données de travail volumineuses et l'exécution Colab.
 - Avant toute modification importante, lire la version courante de `Docs/CONTEXT.md` et `Docs/AVANCEMENT.md` depuis le dépôt et vérifier l'état de la branche `main`.
+- **Machine locale de référence** : MacBook Pro **M1** (Apple Silicon).
+- **Homebrew (`brew`) est installé** sur la machine locale.
 - L'environnement local du projet est maintenant géré avec **uv** et Python **3.12+**.
 - `pyproject.toml` et `uv.lock` sont versionnés à la racine du dépôt.
 
@@ -315,4 +317,4 @@ Important : **ne pas confondre les numéros de cellules du notebook (« chunk 22
 
 ---
 
-*Dernière mise à jour : 9 octobre 2026 — environnement local uv/Python et arborescence modulaire confirmés.*
+*Dernière mise à jour : 13 octobre 2026 — environnement local précisé : MacBook Pro M1, Homebrew, uv/Python.*
