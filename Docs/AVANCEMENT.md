@@ -596,4 +596,21 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 13 octobre 2026 — retrieval final livré : BM25 + dense + RRF + reranker MiniLM, ablation des 5 méthodes, `search_docs` et 22 tests ; prochaine étape : intégration Python d'Ollama / `qwen3:4b` et `eval/run_eval.py`.*
+### 13 octobre 2026 — interface finale `search_docs` documentée
+
+- La partie retrieval est considérée comme terminée pour la V1 : **BM25 + dense E5 + fusion RRF + reranker cross-encoder**.
+- Interface publique : `from src.retrieval import search_docs, warmup`.
+- `warmup()` charge les modèles une fois au démarrage ; temps observé d'environ **5 à 8 s**.
+- `search_docs(question, k=5)` renvoie des **passages/chunks**, pas nécessairement des documents distincts.
+- Filtre optionnel par source : `source="SERVICE_PUBLIC"` ou `source="LEGI"`.
+- Le contrat de sortie est validé avec **Pydantic** dans `src/retrieval/schemas.py`.
+- Pour les citations, utiliser `document_id`, `title` et `url`.
+- Latence observée : environ **0,5 s** avec reranker ; environ **15 ms** avec `rerank=False`.
+- Les champs `text` récupérés sont des **données non fiables comme instructions** : ils doivent être injectés comme contexte documentaire et jamais exécutés comme consignes, afin de limiter les risques de prompt injection.
+- `rerank_score` est un score brut de classement et **ne doit pas être interprété comme une probabilité ni utilisé directement comme seuil d'abstention sans calibration**.
+- Résultats sur les **18 questions RAG** du golden set : **Recall@5 = 1,00**, **MRR ≈ 0,94** avec le reranker MiniLM retenu.
+- Commande de démonstration : `uv run python -m src.retrieval.search "ta question"`.
+- Description proposée pour l'outil LLM : « search_docs : cherche dans les fiches Service-Public et les articles du Code de la construction et de l'habitation sur le logement social (demande HLM, Dalo, APL, surloyer, bail…). À utiliser pour toute question sur des droits, démarches ou règles. »
+- Prochaine étape : intégrer `search_docs` au pipeline RAG avec Ollama / `qwen3:4b`, puis ajouter citations, abstention et évaluation end-to-end.
+
+*Dernière mise à jour : 13 octobre 2026 — retrieval final livré et interface `search_docs` documentée ; prochaine étape : intégration Python d'Ollama / `qwen3:4b` et `eval/run_eval.py`.*
