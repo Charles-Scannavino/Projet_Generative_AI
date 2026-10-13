@@ -238,6 +238,7 @@ Thumbs.db
 content/
 
 # Données Service-Public extraites (le ZIP source peut rester versionné)
+/service_public_xml/
 data/raw/service_public/xml/
 data/raw/service_public/extracted/
 data/raw/service_public/**/*.xml
