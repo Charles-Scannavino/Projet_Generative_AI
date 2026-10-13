@@ -206,6 +206,7 @@ Ablations attendues :
 - **Homebrew (`brew`) est installé** sur la machine locale.
 - L'environnement local du projet est maintenant géré avec **uv** et Python **3.12+**.
 - `pyproject.toml` et `uv.lock` sont versionnés à la racine du dépôt.
+- **Ollama est installé localement** et le modèle génératif de départ retenu est **`qwen3:4b`** (2,5 Go), exécuté sur le MacBook Pro M1 16 Go.
 
 ### Finalisation
 Le notebook sert au prototypage, à l'exploration et aux expériences.
