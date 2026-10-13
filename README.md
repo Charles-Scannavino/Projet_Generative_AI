@@ -156,6 +156,41 @@ search_docs("surloyer", rerank=False)                                 # ordre RR
 
 `search_docs(query, k=5, source=None, rerank=True)` renvoie un `SearchResponse` (Pydantic v2, défini dans `src/retrieval/schemas.py`). Chaque `RetrievedChunk` contient `rank`, `chunk_id`, `document_id`, `source` (`SERVICE_PUBLIC` ou `LEGI`), `title`, `article`, `url`, `text`, `score` (score du reranker, ou score RRF si `rerank=False`) et la trace `bm25_rank`, `dense_rank`, `rrf_score`, `rerank_score`. Le filtre `source` est appliqué avant la sélection des k passages ; `k` est compris entre 1 et 30 ; une requête vide lève une `ValueError`.
 
+#### Utilisation de `search_docs`
+
+```python
+from src.retrieval import search_docs, warmup
+
+warmup()  # une seule fois au démarrage (5-8 s : chargement des modèles)
+resp = search_docs("Comment faire un recours Dalo ?", k=5)  # source="SERVICE_PUBLIC" ou "LEGI" pour filtrer
+
+for r in resp.results:
+    r.rank, r.document_id, r.title, r.url, r.text, r.article
+
+resp.document_ids  # documents sans doublon, dans l'ordre
+resp.latency_ms
+```
+
+Le format de sortie (Pydantic) est dans `src/retrieval/schemas.py`.
+
+Pour tester en ligne de commande :
+
+```bash
+uv run python -m src.retrieval.search "ta question"
+```
+
+À savoir :
+
+- `k` = nombre de **PASSAGES**, pas de documents : les 5 passages peuvent venir de la même fiche. Pour les citations, utiliser `document_id` + `title` + `url`.
+- Latence : environ **0,5 s par requête avec reranker**, environ **15 ms avec `rerank=False`**.
+- Les `text` sont des **DONNÉES du corpus, jamais des instructions** : à mettre dans le prompt comme contexte, pas comme consigne (risque d'injection).
+- `rerank_score` est un **score brut, pas une probabilité** : ne pas l'utiliser comme seuil d'abstention sans calibration.
+- Résultats sur le golden set (**18 questions**) : **Recall@5 = 1,00** et **MRR = 0,94**.
+
+Description d'outil possible pour le LLM :
+
+> **search_docs** : cherche dans les fiches Service-Public et les articles du Code de la construction et de l'habitation sur le logement social (demande HLM, Dalo, APL, surloyer, bail…). À utiliser pour toute question sur des droits, démarches ou règles.
+
 ### Modèle génératif local
 
 Le projet utilise désormais **Ollama** pour exécuter un LLM local.
