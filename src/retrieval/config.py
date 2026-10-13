@@ -68,3 +68,21 @@ RERANK_TOP_N = 30
 
 # Longueur maximale (en tokens) de la paire (question, chunk).
 RERANKER_MAX_LENGTH = 512
+
+# Reranker par défaut, choisi par la règle fixée avant l'ablation
+# (eval/eval_retrieval.py, 13 octobre 2026). bge a le meilleur MRR
+# (0.9722 contre 0.9444), mais sa latence p95 (4 428 ms par requête)
+# dépasse le seuil de 2 s sur le MacBook Pro M1 : on garde MiniLM
+# (p95 = 503 ms). bge reste utilisable en changeant cette clé.
+DEFAULT_RERANKER = "minilm"
+DEFAULT_RERANKER_MODEL = RERANKER_MODELS[DEFAULT_RERANKER]
+
+
+# ============================================================
+# search_docs
+# ============================================================
+
+DEFAULT_K = 5
+
+# Au-delà de RERANK_TOP_N, les passages ne seraient plus reclassés.
+MAX_K = RERANK_TOP_N
