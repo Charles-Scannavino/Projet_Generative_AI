@@ -17,3 +17,8 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+# Racine du dépôt dans le sys.path : `from src.retrieval import search_docs`.
+pythonpath = ["."]
+testpaths = ["tests"]
