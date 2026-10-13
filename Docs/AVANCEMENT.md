@@ -4,7 +4,7 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**), baseline **BM25** et dense retrieval **E5** évalués sur les **18 questions RAG** du golden set. BM25 reste meilleur seul à ce stade. **Prochaine étape : recherche hybride BM25 + dense avec fusion RRF.**
+**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**), baseline **BM25** et dense retrieval **E5** évalués sur les **18 questions RAG** du golden set. **Ollama** est maintenant installé et le modèle local **`qwen3:4b`** (2,5 Go) a été validé sur le **MacBook Pro M1 16 Go**. BM25 reste meilleur seul à ce stade. **Prochaine étape principale : recherche hybride BM25 + dense avec fusion RRF, puis reranker.**
 
 **Étape en cours :**
 - le corpus brut Service-Public a été parsé dans Colab ;
@@ -50,8 +50,11 @@
 - [x] Arborescence GitHub structurée en `Docs/`, `notebooks/`, `eval/`, `data/`, `src/` et `app/`.
 - [x] Décision prise de modulariser ensuite le notebook en fichiers `.py`.
 - [x] Préparer l'environnement local final avec `uv` (`pyproject.toml`, `uv.lock`, Python 3.12.7 vérifié).
-- [x] Vérifier l'exécution locale du projet sur laptop (MacBook Pro Apple Silicon, PyTorch **MPS** opérationnel).
+- [x] Vérifier l'exécution locale du projet sur laptop (**MacBook Pro M1, 16 Go de mémoire unifiée** ; PyTorch **MPS** opérationnel).
+- [x] Vérifier la présence de **Homebrew (`brew`)** sur la machine locale.
 - [x] Mettre en place Ollama / modèle local (`qwen3:4b`, 2,5 Go, MacBook Pro M1 16 Go).
+- [x] Exécuter un premier test interactif avec `ollama run qwen3:4b`.
+- [ ] Tester l'API locale Ollama depuis Python dans le projet.
 
 ### Service-Public — corpus brut
 
@@ -138,7 +141,8 @@
 ### RAG / génération
 
 - [ ] Construire `search_docs`.
-- [ ] Ajouter le modèle génératif local.
+- [x] Installer et valider le modèle génératif local via Ollama : **`qwen3:4b`**.
+- [ ] Intégrer Ollama / `qwen3:4b` au pipeline Python du RAG.
 - [ ] Produire des réponses fondées uniquement sur les sources récupérées.
 - [ ] Ajouter les citations.
 - [ ] Mettre en place une stratégie d'abstention.
@@ -265,6 +269,16 @@ Puis traiter localement les XML et ne sauvegarder sur Drive que les résultats u
 
 **Statut :** ✅ résolu.
 
+### Test du modèle local sans RAG
+
+**Symptôme :** le premier test de `qwen3:4b` sur « Explique en français ce qu'est le DALO » n'a pas identifié correctement le **Droit au logement opposable** et a proposé des interprétations erronées.
+
+**Interprétation :** ce résultat constitue une baseline utile : le LLM local seul ne doit pas être utilisé comme source de vérité sur le domaine HLM.
+
+**Solution retenue :** utiliser `qwen3:4b` comme composant de génération/orchestration, mais lui fournir les connaissances métier via le **RAG Service-Public + LEGI**, avec citations et abstention lorsque les sources sont insuffisantes.
+
+**Statut :** ✅ Ollama et le modèle sont opérationnels ; intégration au pipeline RAG encore à faire.
+
 ## 5. Prochaine action immédiate
 
 Le corpus documentaire, le chunking de référence et les deux premiers retrievers sont maintenant opérationnels et versionnés.
@@ -291,9 +305,10 @@ La prochaine étape est la **recherche hybride BM25 + dense** :
 2. fusionner les rangs avec **RRF** afin d'éviter de mélanger directement des scores de nature différente ;
 3. mesurer `Recall@5`, `Recall@10` et `MRR` sur les mêmes 18 questions ;
 4. comparer les erreurs de BM25, dense et hybride ;
-5. conserver la meilleure configuration avant d'ajouter un **reranker**.
+5. conserver la meilleure configuration avant d'ajouter un **reranker** ;
+6. tester ensuite l'API locale Ollama depuis Python et intégrer `qwen3:4b` au pipeline RAG avec citations structurées.
 
-Le code dense et ses résultats sont versionnés, et `main`, `origin/main` et `review/main` sont synchronisés au commit **`8f22ce1f71bdd46f5b85047a7632018ea85660a8`**.
+Le code dense et ses résultats sont versionnés. Depuis le nettoyage d'historique du 13 octobre, le dépôt principal et le dépôt `review` conservent volontairement **des historiques Git différents** : le dépôt principal utilise l'historique nettoyé, tandis que `review` conserve l'historique d'origine. L'objectif est de maintenir **le même contenu fonctionnel** dans les deux dépôts sans force-push de l'un vers l'autre.
 
 ## 6. Règle de mise à jour de ce fichier
 
@@ -561,4 +576,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 ---
 
-*Dernière mise à jour : 11 octobre 2026 — dense retrieval E5 versionné et synchronisé sur les deux dépôts ; analyse d'erreurs terminée ; prochaine étape : recherche hybride BM25 + dense avec fusion RRF.*
+*Dernière mise à jour : 13 octobre 2026 — MacBook Pro M1 16 Go et Homebrew confirmés ; Ollama + `qwen3:4b` validés localement ; test sans RAG documenté ; prochaine étape : hybride BM25 + dense par RRF, puis reranker et intégration Python d'Ollama.*
