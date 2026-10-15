@@ -4,10 +4,10 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**). ✅ **Retrieval final livré** : `search_docs` = BM25 + dense E5 + fusion **RRF** + reranker **`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`**, évalué sur les **18 questions RAG** (Recall@5 = 1,0000, Recall@10 = 1,0000, MRR = 0,9444, latence p95 = 503 ms/requête sur le MacBook Pro M1) et couvert par **22 tests**. **Ollama** et le modèle local **`qwen3:4b`** (2,5 Go) sont validés sur le **MacBook Pro M1 16 Go**. **Prochaine étape principale : intégrer `qwen3:4b` au pipeline RAG (réponses citées, abstention) et créer `eval/run_eval.py`.**
+**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**). ✅ **Retrieval final livré** : `search_docs` = BM25 + dense E5 + fusion **RRF** + reranker **`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`**, évalué sur les **18 questions RAG** (Recall@5 = 1,0000, Recall@10 = 1,0000, MRR = 0,9444, latence p95 = 503 ms/requête sur le MacBook Pro M1) et couvert par **22 tests**. ✅ **Prototype RAG end-to-end validé** avec Ollama / **`qwen3:4b`** : réponse citée, correction du cas DALO et abstention sur une demande de disponibilité temps réel. **Prochaine étape principale : extraire le RAG hors du notebook, réduire/mesurer la latence et créer `eval/run_eval.py`.**
 
 **Étape en cours :**
-- une première section RAG a été ajoutée au notebook : elle réutilise `search_docs`, appelle l'API locale Ollama et vérifie les citations proposées par le modèle ; l'exécution réelle avec Ollama reste à valider ;
+- le prototype RAG du notebook est validé localement : `search_docs` → Ollama/`qwen3:4b` → sortie Pydantic → citations contrôlées / abstention ;
 - le corpus brut Service-Public a été parsé dans Colab ;
 - 3 004 fiches `F*.xml` ont été indexées dans un DataFrame de métadonnées ;
 - 350 fiches rattachées au sujet `Logement` ont été retenues comme **corpus Service-Public de travail** ;
@@ -614,13 +614,26 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Description proposée pour l'outil LLM : « search_docs : cherche dans les fiches Service-Public et les articles du Code de la construction et de l'habitation sur le logement social (demande HLM, Dalo, APL, surloyer, bail…). À utiliser pour toute question sur des droits, démarches ou règles. »
 - Prochaine étape : intégrer `search_docs` au pipeline RAG avec Ollama / `qwen3:4b`, puis ajouter citations, abstention et évaluation end-to-end.
 
+### 15 octobre 2026 — PR #1 mergée et RAG end-to-end validé
+
+- PR **#1** de Théodore (`feat(rag): ajoute un prototype Ollama au notebook`) validée puis mergée dans `main`.
+- Environnement de test : **MacBook Pro M1, 16 Go**, Python **3.12.7**, PyTorch **2.14.1**, MPS disponible, Ollama **`qwen3:4b`**.
+- Problème local résolu : l'ancien `.venv` sous le dossier du projet ralentissait fortement l'import de PyTorch ; un environnement `uv` externe (`~/.venvs/Projet_Generative_AI`) permet un import normal et l'exécution des tests.
+- Validation retrieval : `uv run pytest -vv -s` → **22/22 tests passés en 23,62 s**.
+- Test CLI DALO : `search_docs("Qu'est-ce que le DALO ?")` retrouve uniquement **`F18005`** dans le top 5 ; méthode `hybrid_rrf+rerank`, latence de requête observée **796 ms** après chargement.
+- Validation RAG réelle dans le notebook :
+  - demande de logement social → réponse correcte, `abstained=false`, citations **`F10007`** et **`F869`** ; latence **137,9 s** au premier appel puis **122,8 s** sur un second appel ;
+  - « Qu'est-ce que le DALO ? » → **« Droit au logement opposable »**, `abstained=false`, citation **`F18005`**, latence **93,2 s** ; le RAG corrige donc l'échec du LLM seul ;
+  - disponibilité HLM « aujourd'hui à Créteil » → `abstained=true`, **aucune citation**, retrieval `F10007` mais source jugée insuffisante pour une disponibilité temps réel ; latence **67,4 s**.
+- Conclusion : pipeline **retrieval → Ollama/Qwen3 → Pydantic → citations/abstention** fonctionnel. Limite principale : latence générative encore élevée ; la sortie d'abstention utilisateur est aussi trop minimale (`"abstained"`) et doit être reformulée proprement.
+- Prochaine action : extraire le composant RAG du notebook vers `src/`, mesurer tokens/latence par étape, optimiser Qwen/Ollama, puis implémenter `eval/run_eval.py`.
+
 ### 13 octobre 2026 — prototype RAG ajouté au notebook
 
 - Les dernières modifications de `origin/main` ont été intégrées à la branche de travail avant l'ajout du notebook.
 - Ajout d'une section RAG en fin de `notebooks/Assistant_HLM_RAG.ipynb`, après l'exploration/préparation Service-Public existante.
 - Le prototype appelle le `search_docs` final du dépôt, envoie les passages récupérés à `qwen3:4b` via l'API HTTP locale Ollama et structure la sortie avec Pydantic.
 - Les identifiants de citations sont contrôlés contre les documents effectivement récupérés ; le prompt traite le texte des sources comme des données, pas comme des instructions, et demande l'abstention lorsque les sources sont insuffisantes.
-- Contrôles effectués : JSON du notebook valide et espaces Git propres. Le modèle Ollama / les modèles de retrieval n'ont pas été lancés depuis cette session ; le test end-to-end reste à faire sur la machine où Ollama est installé.
-- Prochaine action : exécuter les cellules RAG dans l'environnement du dépôt avec Ollama actif, valider citations et abstention, puis extraire le composant stabilisé hors du notebook si nécessaire.
+- Contrôles initiaux : JSON du notebook valide et espaces Git propres. Le runtime Ollama n'avait pas encore été lancé dans cette session ; cette validation a été réalisée le 15 octobre.
 
-*Dernière mise à jour : 13 octobre 2026 — prototype RAG ajouté au notebook, runtime Ollama à valider ; prochaine étape : test end-to-end puis `eval/run_eval.py`.*
+*Dernière mise à jour : 15 octobre 2026 — PR #1 mergée, RAG end-to-end validé ; prochaine étape : extraction vers `src/`, optimisation de la latence et `eval/run_eval.py`.*
