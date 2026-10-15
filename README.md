@@ -207,6 +207,20 @@ Taille du modèle Ollama : 2,5 Go
 
 Un premier test de `qwen3:4b` sans RAG a montré que le modèle ne connaissait pas correctement le terme juridique **DALO**. Ce résultat est volontairement conservé comme baseline : le LLM seul ne doit pas servir de source de vérité. Les connaissances métier doivent être apportées par les documents Service-Public et LEGI récupérés par le RAG.
 
+#### Validation end-to-end du prototype RAG — 15 octobre 2026
+
+Le prototype présent dans `notebooks/Assistant_HLM_RAG.ipynb` a été exécuté localement sur le **MacBook Pro M1 16 Go** avec `qwen3:4b` via Ollama. Le retrieval a d'abord été revalidé avec **22/22 tests passés en 23,62 s**.
+
+| Test | Résultat | Sources / décision | Latence totale observée |
+|---|---|---|---:|
+| « Comment déposer une demande de logement social ? » | réponse correcte, `abstained=false` | `F10007` + `F869` | 137,9 s au premier appel ; 122,8 s à chaud |
+| « Qu'est-ce que le DALO ? » | **« Droit au logement opposable »**, `abstained=false` | `F18005` | 93,2 s |
+| « Quels logements HLM sont disponibles aujourd'hui à Créteil ? » | `abstained=true`, aucune citation fabriquée | retrieval `F10007`, mais source insuffisante pour une disponibilité temps réel | 67,4 s |
+
+Le cas DALO constitue une démonstration utile : **le LLM seul se trompait**, alors que le RAG retrouve `F18005` et corrige la réponse. Les identifiants de citations proposés par le modèle sont validés contre les documents effectivement récupérés.
+
+La chaîne end-to-end **retrieval → Ollama/Qwen3 → sortie Pydantic → citations/abstention** est donc fonctionnelle. La latence générative reste toutefois trop élevée pour une démonstration fluide et doit être optimisée/mesurée plus finement dans l'évaluation finale.
+
 ## Installation locale
 
 ### 1. Prérequis
@@ -530,15 +544,15 @@ uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 
 ## Étapes restantes principales
 
-La fusion hybride RRF, le reranker et `search_docs` sont terminés (voir [Retrieval](#retrieval)). Un premier prototype RAG est présent à la fin du [notebook](notebooks/Assistant_HLM_RAG.ipynb) ; son exécution avec Ollama reste à valider. Restent :
-1. exécuter et valider le prototype avec l'API locale Ollama et `qwen3:4b` ;
-2. stabiliser l'intégration RAG côté Python/agent et la couvrir par une évaluation end-to-end ;
+La fusion hybride RRF, le reranker et `search_docs` sont terminés (voir [Retrieval](#retrieval)). Le prototype RAG du [notebook](notebooks/Assistant_HLM_RAG.ipynb) a été **validé end-to-end avec Ollama / `qwen3:4b`**, y compris citations et abstention. Restent :
+1. extraire/stabiliser l'intégration RAG côté `src/` plutôt que de la laisser uniquement dans le notebook ;
+2. réduire et mesurer la latence de génération, puis enregistrer les tokens Ollama ;
 3. intégrer les plafonds HLM et `check_eligibility` ;
 4. intégrer RPLS et `social_housing_stats` ;
 5. intégrer DVF et `market_prices` ;
 6. construire l'agent et mesurer le routage des outils ;
 7. étendre le golden set vers environ 40 questions ;
-8. créer `eval/run_eval.py` et l'évaluation finale ;
+8. créer `eval/run_eval.py` et l'évaluation end-to-end finale ;
 9. préparer la démonstration et le tag `v1.0`.
 
 Le suivi détaillé est maintenu dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
