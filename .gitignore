@@ -269,6 +269,10 @@ data/processed/*.feather
 # Évaluation : sorties générées
 eval/out/
 eval/results.jsonl
+# Sorties du dernier run (recréées à chaque fois) ; les copies durables sont dans eval/runs/<nom>/
+eval/summary.json
+eval/summary.md
+eval/tmp_check/
 eval/results_*.jsonl
 
 # Modèles / caches Hugging Face / Ollama locaux

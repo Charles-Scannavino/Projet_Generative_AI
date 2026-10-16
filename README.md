@@ -304,11 +304,13 @@ ollama --version
 
 ### 5. Télécharger le modèle local
 
-Le modèle de départ retenu est :
+Le modèle retenu est la variante **instruct** de Qwen3 4B :
 
 ```bash
-ollama pull qwen3:4b
+ollama pull qwen3:4b-instruct
 ```
+
+Attention : le tag `qwen3:4b` pointe vers **Qwen3-4B-Thinking-2507**, qui raisonne toujours avant de répondre, même avec `think=false` (vérifié sur la page des tags Ollama et en local). C'est la cause probable des 67 à 138 s par question mesurées au départ. `qwen3:4b-instruct` (Qwen3-4B-Instruct-2507) a la même taille sans cette phase de raisonnement.
 
 Vérifier les modèles installés :
 
@@ -319,7 +321,7 @@ ollama list
 La configuration validée affiche actuellement :
 
 ```text
-qwen3:4b    2.5 GB
+qwen3:4b-instruct    2.5 GB
 ```
 
 ### 6. Tester le modèle
@@ -327,7 +329,7 @@ qwen3:4b    2.5 GB
 Lancer une session interactive :
 
 ```bash
-ollama run qwen3:4b
+ollama run qwen3:4b-instruct
 ```
 
 Exemple :
@@ -352,7 +354,7 @@ Le mode de raisonnement devra être évalué séparément si nous décidons de l
 
 ## Ollama : rôle dans le projet
 
-Ollama **n'est pas un moteur de recherche Web**. Dans notre configuration, il exécute localement `qwen3:4b` sur le Mac.
+Ollama **n'est pas un moteur de recherche Web**. Dans notre configuration, il exécute localement `qwen3:4b-instruct` sur le Mac.
 
 Lors d'un appel simple :
 
@@ -410,19 +412,25 @@ Projet_Generative_AI/
 │   ├── ingestion/
 │   ├── preprocessing/
 │   ├── retrieval/
-│   ├── tools/
-│   └── agent/
+│   ├── tools/                # eligibility.py (check_eligibility)
+│   └── agent/                # schemas, ollama, rag, agent, baseline, retrieval
 ├── eval/
-│   ├── golden.jsonl
-│   ├── golden_backlog_pending.jsonl
+│   ├── golden.jsonl          # 52 questions, splits dev / test
+│   ├── check_golden.py
+│   ├── run_eval.py           # évaluation end-to-end
 │   ├── metrics.py
 │   ├── eval_bm25_chunking.py
 │   ├── eval_dense.py
 │   ├── eval_retrieval.py
-│   └── retrieval/            # summary.csv, details.csv
+│   ├── retrieval/            # summary.csv, details.csv (dev)
+│   └── runs/                 # un dossier par run end-to-end
 ├── tests/
-│   └── test_retrieval.py
+│   ├── test_retrieval.py
+│   ├── test_eligibility.py
+│   └── test_eval_pipeline.py
+├── .env.example
 └── app/
+    └── streamlit_app.py
 ```
 
 ## Code Python principal
@@ -501,59 +509,69 @@ Le golden set actif est :
 eval/golden.jsonl
 ```
 
-Il contient actuellement :
+Il contient **52 questions**, réparties en deux splits :
 
-- **18 questions RAG** ;
-- **1 question hors périmètre** ;
-- **1 prompt injection**.
+| Split | Questions | Rôle |
+|---|---:|---|
+| `dev` | 20 (q001-q020) | ont servi aux choix du retrieval (chunking, reranker) |
+| `test` | 32 (q021-q052) | **held-out** : jamais utilisées pour régler le système, résultats finaux |
 
-Les futurs cas d'éligibilité, RPLS et DVF sont conservés dans :
+| Type | dev | test | Ce qui est vérifié |
+|---|---:|---:|---|
+| `rag` (Service-Public) | 18 | 10 | retrieval + citations ; les 10 du test sont en langage courant, dont 6 « jumeaux » de questions dev (`twin_of`) |
+| `rag` (LEGI, CCH) | 0 | 7 | articles du Code de la construction (74 % du corpus) |
+| `eligibility` | 0 | 5 | appel de `check_eligibility` et résultat exact (zone, catégorie, PLAI/PLUS/PLS) |
+| `clarification` | 0 | 2 | l'assistant demande la commune et le foyer au lieu de conclure |
+| `rpls`, `dvf` | 0 | 2 | `status: pending_data` tant que les outils ne sont pas prêts |
+| `out_of_scope` | 1 | 2 | abstention sans chiffre inventé |
+| `prompt_injection` | 1 | 2 | injection directe, injection dans la question, citation inventée |
+| `causal_trap` | 0 | 2 | aucune conclusion causale HLM / délinquance / pauvreté |
 
-```text
-eval/golden_backlog_pending.jsonl
-```
+Champs : `id`, `split`, `type`, `question`, `answer`, `gold_docs` (documents qui contiennent la réponse), `acceptable_docs` (autres documents qui la contiennent aussi : comptés pour Hit@k et MRR, pas pour Recall), `expected_tool`, `should_abstain`, `expected` pour l'éligibilité et `twin_of` pour les jumeaux de questions dev.
 
-Évaluations déjà disponibles :
+Contrôle d'intégrité (à lancer avant chaque commit du golden set) :
 
 ```bash
-uv run python eval/eval_bm25_chunking.py
-uv run python eval/eval_dense.py
-uv run python eval/eval_retrieval.py
+uv run python eval/check_golden.py --bm25
 ```
 
-`eval/eval_retrieval.py` est l'ablation unifiée du retrieval (BM25, dense, hybride, hybride + rerankers) ; ses résultats sont écrits dans `eval/retrieval/`. Les tests du contrat `search_docs` se lancent avec `uv run pytest -q`.
+Avec BM25 seul, le split `dev` donne Hit@5 = 1,00 (18 questions) et le split `test` Hit@5 = 0,47 (17 questions) : le split `test` mesure enfin ce qu'apportent le dense et le reranker. Les paires `twin_of` comparent un même sujet formulé comme le titre de la fiche (dev) ou en langage courant (test).
 
-La commande finale prévue par l'énoncé sera :
+Évaluations du retrieval :
+
+```bash
+uv run python eval/eval_bm25_chunking.py      # split dev
+uv run python eval/eval_dense.py              # split dev
+uv run python eval/eval_retrieval.py          # split dev -> eval/retrieval/
+uv run python eval/eval_retrieval.py test     # split test -> eval/retrieval_test/
+```
+
+### Évaluation end-to-end
 
 ```bash
 uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 ```
 
-**Attention : `eval/run_eval.py` n'est pas encore implémenté à ce stade.**
+Options : `--backend baseline|rag|agent` (défaut `agent`), `--retriever hybrid|hybrid_norerank|bm25`, `--model qwen3:4b-instruct`, `--judge` (juge LLM), `--split dev|test`, `--run-name <nom>` (copie dans `eval/runs/<nom>/`), `--resume`, `--compare` (tableau de tous les runs dans `eval/runs/comparison.md`).
 
-À terme, l'évaluation finale doit enregistrer par question au minimum :
+`eval/results.jsonl` contient, par question : réponse, sources citées, documents récupérés, tokens in/out, latence (totale et par étape), appels d'outils, stop reason, coût et métriques (`hit_at_5`, `recall_at_5`, `rr`, `citation_precision`, `cites_relevant_doc`, `invented_citation`, `abstention_ok`, `routing_ok`, `eligibility_exact`, `judge_score`). `eval/summary.md` agrège par split et par type.
 
-- réponse ;
-- sources citées ;
-- documents récupérés ;
-- tokens en entrée/sortie ;
-- latence ;
-- appels d'outils ;
-- raison d'arrêt / abstention ;
-- coût.
+## Interface
+
+```bash
+uv run streamlit run app/streamlit_app.py
+```
+
+Onglet **Assistant** : réponse, badge de statut (réponse sourcée, abstention, précision demandée, erreur), calcul d'éligibilité détaillé, sources cliquables, latence / tokens / coût, et trace de l'agent (outils appelés, arguments, passages avec rangs BM25 / dense / reranker). Onglet **Évaluation** : comparaison des runs de `eval/runs/` et détail question par question. Sans Ollama : backend `baseline` + recherche `BM25 seul`.
 
 ## Étapes restantes principales
 
-La fusion hybride RRF, le reranker et `search_docs` sont terminés (voir [Retrieval](#retrieval)). Le prototype RAG du [notebook](notebooks/Assistant_HLM_RAG.ipynb) a été **validé end-to-end avec Ollama / `qwen3:4b`**, y compris citations et abstention. Restent :
-1. extraire/stabiliser l'intégration RAG côté `src/` plutôt que de la laisser uniquement dans le notebook ;
-2. réduire et mesurer la latence de génération, puis enregistrer les tokens Ollama ;
-3. intégrer les plafonds HLM et `check_eligibility` ;
-4. intégrer RPLS et `social_housing_stats` ;
-5. intégrer DVF et `market_prices` ;
-6. construire l'agent et mesurer le routage des outils ;
-7. étendre le golden set vers environ 40 questions ;
-8. créer `eval/run_eval.py` et l'évaluation end-to-end finale ;
-9. préparer la démonstration et le tag `v1.0`.
+Terminé : retrieval (`search_docs`), RAG modulaire (`src/agent/rag.py`, `think=False`, tokens Ollama enregistrés), agent avec outils (`src/agent/agent.py`), `check_eligibility` (plafonds 2026), golden set de 52 questions, `eval/run_eval.py`, interface Streamlit. Restent :
+1. intégrer RPLS et `social_housing_stats` (`src/tools/rpls.py`, enregistré automatiquement par l'agent) ;
+2. intégrer DVF et `market_prices` (`src/tools/dvf.py`) ;
+3. compléter les réponses de q036 / q037 depuis les fichiers bruts ;
+4. lancer les runs finaux (baseline, rag, agent, 2 modèles) et rédiger l'analyse d'erreurs ;
+5. préparer la démonstration, enregistrer la vidéo de secours et poser le tag `v1.0`.
 
 Le suivi détaillé est maintenu dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
 Les règles, décisions et contraintes durables sont dans [Docs/CONTEXT.md](Docs/CONTEXT.md).

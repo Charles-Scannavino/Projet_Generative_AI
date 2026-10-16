@@ -595,6 +595,24 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Clarification : le chunking documentaire n'est pas encore réalisé.
 - Ajout de la règle de mise à jour régulière de ce fichier.
 
+### 15 octobre 2026 — golden set v2, run_eval, agent et interface (Gaby)
+
+- Golden set porté à **52 questions** avec deux splits : `dev` (q001-q020, ayant servi aux choix du retrieval, texte inchangé) et `test` (q021-q052, **held-out**).
+- Nouveaux types : 10 questions en langage courant (dont 6 « jumeaux » de questions dev, champ `twin_of`), 7 questions sur les articles LEGI (0 auparavant), 5 cas d'éligibilité calculés à la main depuis l'arrêté du 19/12/2025, 2 demandes de précision, 2 RPLS/DVF (`pending_data`), 2 hors périmètre, 2 injections, 2 pièges causaux.
+- Nouveaux champs : `split`, `acceptable_docs` (documents qui contiennent aussi la réponse, comptés pour Hit@k/MRR), `expected_tool`, `should_abstain`, `expected`.
+- `eval/check_golden.py` : intégrité (ids, types, documents présents dans le corpus). BM25 seul : Hit@5 = 1,00 sur `dev` (18 questions) mais **0,47 sur `test`** (17 questions) ; le split `test` discrimine enfin les méthodes de retrieval.
+- Constat données : la fiche F869 affiche les plafonds **PLS** (PLUS x 1,3) et ses tableaux sont aplatis par le parser (montants sans libellé de catégorie) ; d'où un outil déterministe plutôt qu'une lecture par le LLM.
+- `src/tools/eligibility.py` (+ 11 tests) : catégories de ménage, jeune ménage, handicap, 3 zones, PLAI / PLUS / PLS 2026.
+- `src/agent/` : contrat `AssistantResponse` commun ; backends `baseline` (BM25 sans LLM), `rag` (extrait du notebook, `think=False`, tokens, citation inventée supprimée et signalée au lieu d'une exception) et `agent` (tool calling Ollama, validation Pydantic des arguments, au plus 3 tours).
+- `eval/run_eval.py` : commande de l'énoncé, `results.jsonl` complet, `summary.md`, juge LLM optionnel, `--run-name` / `--compare` pour les ablations.
+- `app/streamlit_app.py` : réponse, sources, calcul d'éligibilité, métriques, trace de l'agent, onglet Évaluation.
+- Scripts d'évaluation du retrieval restreints au split `dev` par défaut (résultats de référence inchangés) ; `eval_retrieval.py test` pour le held-out.
+- Constat modèle (16 octobre) : le tag Ollama `qwen3:4b` pointe vers Qwen3-4B-**Thinking**-2507, qui raisonne toujours avant de répondre, même avec `--think=false` (testé sur le portable Windows de Gaby). Modèle par défaut changé pour `qwen3:4b-instruct` (Qwen3-4B-Instruct-2507, même taille). Test sans RAG : le modèle développe « HLM » en « Habitat Locatif Meublé » au lieu d'*Habitation à Loyer Modéré*, exemple de plus pour la soutenance.
+- Premiers essais réels (16 octobre, portable Windows sans GPU, qwen3:4b-instruct, environ 33 tokens/s en lecture et 10 tokens/s en génération) :
+  - **tool calling natif abandonné** : sur q001, le modèle n'a appelé aucun outil (0 appel, 511 tokens générés) puis s'est abstenu faute de sources. L'agent appelle désormais toujours `search_docs`, puis le LLM remplit un **formulaire JSON contraint** (action + situation du ménage) ; Python décide (outil ou demande de précision). Résultat sur q001 : F10007 au rang 1, cité, réponse correcte (164 s sur ce portable).
+  - **chiffre mal recopié** : en reformulant `check_eligibility` (q030), le modèle a écrit « 37 504 € » au lieu de 37 584 €, a étendu le barème à l'outre-mer et décrit le PLS comme « revenus élevés ». Correction : la réponse d'éligibilité est rédigée par Python à partir du résultat de l'outil (plus aucun chiffre ne passe par le LLM, un appel LLM en moins), et un détecteur signale tout nombre de 3 chiffres ou plus absent des sources (métrique `unsupported_number`).
+- Prochaine action : `ollama pull qwen3:4b-instruct`, lancer les runs réels sur le Mac, puis RPLS / DVF.
+
 ---
 
 ### 13 octobre 2026 — interface finale `search_docs` documentée
@@ -636,4 +654,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Les identifiants de citations sont contrôlés contre les documents effectivement récupérés ; le prompt traite le texte des sources comme des données, pas comme des instructions, et demande l'abstention lorsque les sources sont insuffisantes.
 - Contrôles initiaux : JSON du notebook valide et espaces Git propres. Le runtime Ollama n'avait pas encore été lancé dans cette session ; cette validation a été réalisée le 15 octobre.
 
-*Dernière mise à jour : 15 octobre 2026 — PR #1 mergée, RAG end-to-end validé ; prochaine étape : extraction vers `src/`, optimisation de la latence et `eval/run_eval.py`.*
+*Dernière mise à jour : 15 octobre 2026 — golden set v2 (52 questions), run_eval, agent et interface.*
