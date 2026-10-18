@@ -221,6 +221,78 @@ Le cas DALO constitue une démonstration utile : **le LLM seul se trompait**, al
 
 La chaîne end-to-end **retrieval → Ollama/Qwen3 → sortie Pydantic → citations/abstention** est donc fonctionnelle. La latence générative reste toutefois trop élevée pour une démonstration fluide et doit être optimisée/mesurée plus finement dans l'évaluation finale.
 
+### Outils déterministes
+
+Les calculs ne sont jamais confiés au LLM : trois outils Python (`src/tools/`) renvoient des sorties Pydantic avec `provenance` (source, millésime) et `caveats` (limites des données).
+
+| Outil | Données | Ce qu'il renvoie | Hors périmètre |
+|---|---|---|---|
+| `check_eligibility` | Plafonds PLAI / PLUS / PLS **2026** (arrêté du 19/12/2025), saisis dans `data/processed/plafonds_hlm_2026.csv` | Catégorie de ménage, zone, plafond et écart pour chaque financement | DOM (régime distinct) |
+| `social_housing_stats` | RPLS au **1er janvier 2025** (SDES), agrégé par commune | Nombre de logements sociaux, financement initial, taille, QPV, ancienneté, DPE | Disponibilité, vacance, loyers |
+| `market_prices` | DVF **2024 et 2025**, France entière, agrégé par commune | Prix médian au m², quartiles, nombre de ventes | Loyers ; Alsace-Moselle et Mayotte |
+
+Les communes sont résolues dans le COG Insee 2026 (`src/tools/communes.py`) : homonymes signalés avec leurs candidats, arrondissements de Paris/Lyon/Marseille, communes déléguées rattachées à leur commune nouvelle.
+
+Reconstruire les données (les fichiers bruts ne sont pas versionnés, les agrégats le sont) :
+
+```bash
+uv run python -m src.preprocessing.build_communes_ref   # télécharge le COG
+uv run python -m src.ingestion.rpls && uv run python -m src.preprocessing.build_rpls_stats
+uv run python -m src.ingestion.dvf  && uv run python -m src.preprocessing.build_dvf_stats
+```
+
+### Backends de l'assistant
+
+Tous les backends renvoient le même contrat Pydantic `AssistantResponse` (`src/agent/schemas.py`), utilisé par l'interface et par `eval/run_eval.py`. Point d'entrée unique : `from src.agent import ask`.
+
+| Backend | Principe | Modèle |
+|---|---|---|
+| `baseline` | BM25 seul, sans LLM (`src/agent/baseline.py`) | aucun |
+| `rag` | `search_docs` puis synthèse citée (`src/agent/rag.py`) | Ollama `qwen3:4b-instruct` |
+| `agent` | recherche systématique + formulaire JSON rempli par le LLM ; Python choisit et exécute l'outil (`src/agent/agent.py`), conçu pour un petit modèle local | Ollama `qwen3:4b-instruct` |
+| `agent_tools` | **tool calling natif** : le LLM enchaîne `search_docs` et les trois outils, puis répond via un pseudo-outil `final_answer` (`src/agent/tool_agent.py`) | `openai/gpt-4.1-mini` via OpenRouter (`temperature = 0`, `seed = 42`), ou Ollama |
+
+Configuration de `agent_tools` : `configs/agent.yaml` et `configs/tools.yaml` (lus par `src/settings.py`), prompts dans `prompts/*.md.j2` (Jinja2). Le secret `OPENROUTER_API_KEY` est lu uniquement depuis `.env` (voir `.env.example`). Toute valeur YAML peut être surchargée par variable d'environnement, ex. `HLM_AGENT__BACKEND=ollama`.
+
+```bash
+cp .env.example .env    # puis renseigner OPENROUTER_API_KEY
+uv run python -m src.agent "Avec 28 000 € pour un couple avec un enfant à Lyon, suis-je éligible ?"
+uv run python -m src.agent "Combien de logements sociaux à Créteil ?" --backend agent_tools --provider ollama --json
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/ --backend agent_tools --run-name agent_tools_gpt41mini
+```
+
+**Garde-fous contre la prompt injection** (`src/agent/guards.py`, `src/agent/tools_registry.py`) :
+
+- entrées d'outils validées strictement (champs inconnus refusés, pas de coercition, noms de commune contraints puis résolus dans une liste fermée) ; le LLM recopie des faits (en couple, âges, personnes à charge), Python calcule la catégorie de ménage et le « jeune ménage » ;
+- registre d'outils fermé, quota d'appels par outil, arrêt sur appels répétés ; `search_docs` n'expose au modèle que la requête (ni `k` ni filtre de source) ;
+- sorties renvoyées au LLM dans une enveloppe JSON `untrusted_data`, marqueurs de rôle (`<|im_start|>`, `[INST]`…) neutralisés, passages tronqués ;
+- une commune absente de la question est refusée ; un département « deviné » pour lever une homonymie est retiré ;
+- citations limitées aux documents réellement récupérés (titre et URL tirés du corpus) ; citations retirées et chiffres absents des sources signalés dans `warnings` (métriques `invented_citation` et `unsupported_number` de `run_eval`).
+
+Résultats du 18 octobre 2026 avec `run_eval.py` (golden v2, 50 questions évaluables, juge `google/gemini-2.5-flash` via OpenRouter, d'une autre famille que les modèles évalués) :
+
+| Run | Modèle | Hit@5 dev / test | Justesse (juge) | Abstention correcte | Routage | Éligibilité exacte | Citations inventées | Chiffres non ancrés | Latence p50 / p95 | Coût agent |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `baseline_bm25` | aucun (extractif) | 1,00 / 0,35 | – | 0,84 | 0,86 | 0,00 | 0 | – | 0,02 / 0,04 s | 0 |
+| `agent_tools_gpt41mini` | `openai/gpt-4.1-mini` | 0,94 / 0,59 | **0,89** | 0,94 | 0,94 | 1,00 | 0 | 0,02 | 7,5 / 14,4 s* | 0,086 $ |
+| `agent_tools_mistral_small_24b` | `mistralai/mistral-small-3.2-24b-instruct` | 0,89 / 0,59 | 0,85 | 0,94 | 0,98 | 1,00 | 0 | 0,04 | 5,8 / 12,7 s | **0,037 $** |
+| `agent_tools_qwen3_30b_a3b` | `qwen/qwen3-30b-a3b-instruct-2507` | 0,89 / 0,65 | 0,61 | 0,66 | 0,90 | 1,00 | 0 | 0,02 | 25,6 / 46,1 s | 0,089 $ |
+
+\* Machine chargée pendant ce run ; sans charge (17 octobre) : p50 4,1 s, p95 4,9 s. Coût du juge : environ 0,014 $ par run.
+
+Lecture : `gpt-4.1-mini` est le meilleur compromis (backend par défaut). Mistral Small est 2,3 fois moins cher, mais a recopié des plafonds faux dans 2 réponses d'éligibilité sur 5 (signalés par `unsupported_number`, la réponse reste fausse). Qwen3-30B enchaîne mal les outils (46 appels répétés, 32 communes inventées refusées) et s'abstient à tort sur 12 questions RAG.
+
+```bash
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/ --backend agent_tools \
+    --model openai/gpt-4.1-mini --judge --judge-provider openrouter --judge-model google/gemini-2.5-flash \
+    --run-name agent_tools_gpt41mini
+uv run python eval/run_eval.py --compare      # tableau de tous les runs (eval/runs/comparison.md)
+```
+
+**Mode local (Ollama)** : `agent_tools --provider ollama` passe par l'API native `/api/chat` (client partagé `src/agent/ollama.py`, contexte `OLLAMA_NUM_CTX` = 8 192 à chaque requête). L'endpoint compatible OpenAI `/v1` ignore la taille de contexte demandée : avec le contexte par défaut du serveur (4 096 tokens sur un Mac à 8 Go), le 2e tour de l'agent (≈ 5 200 tokens) était refusé. Quand `qwen3:4b-instruct` répond en texte libre au lieu d'appeler `final_answer`, l'agent fait reformuler la réponse en sortie JSON contrainte (citations et abstention récupérées). Vérifié le 18 octobre sur un MacBook Air M2 8 Go (Ollama 0.40.6) : Dalo (citation F18005), éligibilité, DVF, demande de précision et injection corrects avec `agent_tools`, ainsi qu'avec les backends `agent` et `rag` ; 9 à 75 s par question. Sur une machine à 8 Go, ne lancer qu'un seul processus (évaluation ou UI) à la fois avec Ollama.
+
+Détails et analyse d'erreurs dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md) et `eval/runs/`.
+
 ## Installation locale
 
 ### 1. Prérequis
@@ -412,8 +484,12 @@ Projet_Generative_AI/
 │   ├── ingestion/
 │   ├── preprocessing/
 │   ├── retrieval/
-│   ├── tools/                # eligibility.py (check_eligibility)
-│   └── agent/                # schemas, ollama, rag, agent, baseline, retrieval
+│   ├── tools/                # eligibility, social_housing (RPLS), market_prices (DVF), communes (COG)
+│   ├── agent/                # schemas, ollama, rag, agent, baseline, retrieval, tool_agent, llm, tools_registry, guards
+│   ├── config.py             # chemins fixes
+│   └── settings.py           # réglages typés (configs/*.yaml + .env)
+├── configs/                  # agent.yaml, tools.yaml
+├── prompts/                  # system.md.j2, final_answer.md.j2, tool_descriptions.yaml
 ├── eval/
 │   ├── golden.jsonl          # 52 questions, splits dev / test
 │   ├── check_golden.py
@@ -427,7 +503,10 @@ Projet_Generative_AI/
 ├── tests/
 │   ├── test_retrieval.py
 │   ├── test_eligibility.py
-│   └── test_eval_pipeline.py
+│   ├── test_eval_pipeline.py
+│   ├── test_tools.py
+│   ├── test_tool_security.py
+│   └── test_agent.py
 ├── .env.example
 └── app/
     └── streamlit_app.py
@@ -552,7 +631,7 @@ uv run python eval/eval_retrieval.py test     # split test -> eval/retrieval_tes
 uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 ```
 
-Options : `--backend baseline|rag|agent` (défaut `agent`), `--retriever hybrid|hybrid_norerank|bm25`, `--model qwen3:4b-instruct`, `--judge` (juge LLM), `--split dev|test`, `--run-name <nom>` (copie dans `eval/runs/<nom>/`), `--resume`, `--compare` (tableau de tous les runs dans `eval/runs/comparison.md`).
+Options : `--backend baseline|rag|agent|agent_tools` (défaut `agent`), `--provider openrouter|ollama` (pour `agent_tools`), `--retriever hybrid|hybrid_norerank|bm25`, `--model qwen3:4b-instruct`, `--judge` (juge LLM ; `--judge-provider ollama|openrouter`, `--judge-model`), `--split dev|test`, `--run-name <nom>` (copie dans `eval/runs/<nom>/`), `--resume`, `--compare` (tableau de tous les runs dans `eval/runs/comparison.md`).
 
 `eval/results.jsonl` contient, par question : réponse, sources citées, documents récupérés, tokens in/out, latence (totale et par étape), appels d'outils, stop reason, coût et métriques (`hit_at_5`, `recall_at_5`, `rr`, `citation_precision`, `cites_relevant_doc`, `invented_citation`, `abstention_ok`, `routing_ok`, `eligibility_exact`, `judge_score`). `eval/summary.md` agrège par split et par type.
 
@@ -566,12 +645,10 @@ Onglet **Assistant** : réponse, badge de statut (réponse sourcée, abstention,
 
 ## Étapes restantes principales
 
-Terminé : retrieval (`search_docs`), RAG modulaire (`src/agent/rag.py`, `think=False`, tokens Ollama enregistrés), agent avec outils (`src/agent/agent.py`), `check_eligibility` (plafonds 2026), golden set de 52 questions, `eval/run_eval.py`, interface Streamlit. Restent :
-1. intégrer RPLS et `social_housing_stats` (`src/tools/rpls.py`, enregistré automatiquement par l'agent) ;
-2. intégrer DVF et `market_prices` (`src/tools/dvf.py`) ;
-3. compléter les réponses de q036 / q037 depuis les fichiers bruts ;
-4. lancer les runs finaux (baseline, rag, agent, 2 modèles) et rédiger l'analyse d'erreurs ;
-5. préparer la démonstration, enregistrer la vidéo de secours et poser le tag `v1.0`.
+Terminé : retrieval (`search_docs`), RAG modulaire (`src/agent/rag.py`), agent local par formulaire JSON (`src/agent/agent.py`), agent à tool calling natif (`src/agent/tool_agent.py`, OpenRouter ou Ollama), outils déterministes `check_eligibility`, `social_housing_stats` (RPLS) et `market_prices` (DVF), golden set de 52 questions, `eval/run_eval.py`, interface Streamlit. Restent :
+1. compléter les réponses de q036 / q037 maintenant que RPLS et DVF sont intégrés ;
+2. lancer les runs finaux (baseline, rag, agent local, agent à outils, 2 modèles) et rédiger l'analyse d'erreurs ;
+3. préparer la démonstration, enregistrer la vidéo de secours et poser le tag `v1.0`.
 
 Le suivi détaillé est maintenu dans [Docs/AVANCEMENT.md](Docs/AVANCEMENT.md).  
 Les règles, décisions et contraintes durables sont dans [Docs/CONTEXT.md](Docs/CONTEXT.md).
