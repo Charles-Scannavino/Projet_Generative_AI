@@ -252,6 +252,8 @@ data/raw/dvf/*
 !data/raw/dvf/.gitkeep
 data/raw/plafonds/*
 !data/raw/plafonds/.gitkeep
+data/raw/cog/
+*.part
 
 # Index / embeddings / caches
 data/indexes/*
