@@ -637,3 +637,46 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Contrôles initiaux : JSON du notebook valide et espaces Git propres. Le runtime Ollama n'avait pas encore été lancé dans cette session ; cette validation a été réalisée le 15 octobre.
 
 *Dernière mise à jour : 15 octobre 2026 — PR #1 mergée, RAG end-to-end validé ; prochaine étape : extraction vers `src/`, optimisation de la latence et `eval/run_eval.py`.*
+
+### 18 octobre 2026 — serveur MCP et tests validés
+
+**Responsable : Charles — bonus MCP.**
+
+- Branche de travail : `charles-bonus-mcp`, créée depuis `main`.
+- SDK MCP Python 2.3.0 installé avec `uv`.
+- Serveur créé : `src/mcp_server.py`.
+- Premier outil exposé : `search_docs`.
+- Réutilisation directe du retrieval existant : BM25 + E5 + RRF + MiniLM.
+- Réponse MCP structurée en JSON avec identifiants, sources, passages et latence.
+- Découverte de l'outil validée avec un client MCP.
+- Recherche DALO validée : document `F18005` retrouvé.
+- Transport `stdio` validé avec un serveur exécuté en sous-processus.
+- Tests automatisés ajoutés dans `tests/test_mcp_server.py`.
+- Tests MCP : 2/2 réussis en 4,35 s.
+- Tests globaux : 24/24 réussis en 19,15 s.
+
+**Limites actuelles :**
+- Seul `search_docs` est exposé.
+- Pas encore de démonstration dans un client MCP tiers.
+- Les autres outils seront intégrés après validation de leurs modules.
+- Aucun commit ni push effectué à cette étape.
+
+**Prochaines actions :**
+1. Compléter les tests de validation des arguments et des erreurs.
+2. Connecter le serveur à un client MCP externe.
+3. Documenter l'installation et l'utilisation du serveur.
+4. Préparer la livraison de la branche bonus MCP.
+
+
+### 18 octobre 2026 — validations complémentaires MCP
+
+- Gestion des erreurs avec `ToolError`.
+- Question vide rejetée avec un message explicite.
+- Valeur `k=0` rejetée avec un message explicite.
+- Absence de traceback inattendue pour ces erreurs.
+- Tests MCP : 4/4 réussis en 4,30 s.
+- Tests globaux : 26/26 réussis en 19,11 s.
+- Aucun échec détecté dans les tests existants.
+
+**Prochaine étape :** premier commit sur la branche dédiée,
+puis démonstration et documentation du client MCP externe.
