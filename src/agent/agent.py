@@ -74,15 +74,22 @@ DEFAULT_ROUTE = Route(action="documents", revenu_fiscal_reference=0, nb_personne
 
 
 def stats_tools() -> dict[str, Any]:
-    """Outils statistiques disponibles : src/tools/rpls.py et dvf.py (TOOL_SPEC + run), s'ils existent."""
-    tools = {}
-    for action, module_name in (("stats_commune", "src.tools.rpls"), ("prix_commune", "src.tools.dvf")):
-        try:
-            module = __import__(module_name, fromlist=["TOOL_SPEC", "run"])
-            tools[action] = (module.TOOL_SPEC["function"]["name"], module.run)
-        except ImportError:
-            pass
-    return tools
+    """Outils statistiques : RPLS (src/tools/social_housing.py) et DVF (src/tools/market_prices.py).
+
+    Chaque `run(arguments)` valide les arguments avec le schéma strict de l'outil et
+    renvoie sa sortie JSON ; une commune inconnue ou ambiguë lève une ValueError
+    (ToolError) dont le message est rédigé par l'outil.
+    """
+    from src.tools.market_prices import MarketPricesInput, market_prices
+    from src.tools.social_housing import SocialHousingInput, social_housing_stats
+
+    def runner(input_model, tool):
+        return lambda arguments: tool(input_model.model_validate(arguments)).model_dump(mode="json")
+
+    return {
+        "stats_commune": ("social_housing_stats", runner(SocialHousingInput, social_housing_stats)),
+        "prix_commune": ("market_prices", runner(MarketPricesInput, market_prices)),
+    }
 
 
 def missing_for_eligibility(route: Route) -> list[str]:
@@ -133,7 +140,7 @@ def eligibility_answer(result: dict) -> str:
         f"votre foyer relève de la catégorie {result['categorie']}"
         + (" (jeune ménage)" if result.get("jeune_menage") else "")
         + f", zone « {ZONE_LABELS.get(result['zone'], result['zone'])} ».",
-        f"Avec {euros(result['revenu'])} de revenu fiscal de référence : "
+        f"Avec {euros(result['revenu_fiscal_reference'])} de revenu fiscal de référence : "
         + ", ".join(f"{kind.upper()} {yes_no[result['eligible'][kind]]} (plafond {euros(amount)})"
                     for kind, amount in result["plafonds"].items()) + ".",
         result["verdict"],
@@ -214,7 +221,10 @@ def run_agent(
         available = stats_tools()
         if route.action in available and route.commune.strip():
             name, run = available[route.action]
-            call = ToolCall(name=name, arguments={"commune": route.commune.strip()})
+            arguments = {"commune": route.commune.strip()}
+            if route.departement.strip():
+                arguments["departement"] = route.departement.strip()
+            call = ToolCall(name=name, arguments=arguments)
             tool_start = time.perf_counter()
             try:
                 call.output = run(call.arguments)
@@ -231,7 +241,7 @@ def run_agent(
     if eligibility is not None:
         citations = [Citation(document_id="BAREME-2026", source="BAREME",
                               title="Plafonds de ressources 2026 (arrêté du 19/12/2025, tableau ANIL)",
-                              url=eligibility.output["source"])]
+                              url=eligibility.output["provenance"]["source_url"])]
         f869 = next((p for p in passages if p.document_id == "F869"), None)
         if f869 is not None:
             citations.append(Citation(document_id=f869.document_id, source=f869.source, title=f869.title, url=f869.url))

@@ -75,16 +75,22 @@ with st.sidebar:
     st.header("Réglages")
     backend = st.radio(
         "Backend", BACKENDS, index=BACKENDS.index("agent"),
-        help="baseline : BM25 sans LLM · rag : recherche + Qwen3 · agent : Qwen3 choisit les outils",
-        format_func={"baseline": "baseline (sans LLM)", "rag": "rag", "agent": "agent (outils)"}.get,
+        help="baseline : BM25 sans LLM · rag : recherche + Qwen3 · agent : Qwen3 choisit les outils · "
+             "agent_tools : tool calling natif (API OpenRouter ou Ollama)",
+        format_func={"baseline": "baseline (sans LLM)", "rag": "rag", "agent": "agent (outils)",
+                     "agent_tools": "agent_tools (tool calling)"}.get,
     )
+    provider = None
+    if backend == "agent_tools":
+        provider = st.radio("Fournisseur", ["openrouter", "ollama"], horizontal=True,
+                            help="openrouter : modèle API de configs/agent.yaml (clé dans .env)")
     retriever = st.selectbox(
         "Recherche", ["hybrid", "hybrid_norerank", "bm25"],
         format_func={"hybrid": "Hybride + reranker", "hybrid_norerank": "Hybride (RRF)", "bm25": "BM25 seul"}.get,
     )
     k = st.slider("Passages (k)", 1, 10, 5)
     models = ollama_models()
-    if backend != "baseline":
+    if backend != "baseline" and provider != "openrouter":
         if models is None:
             st.error("Ollama injoignable. Lancer `ollama serve`.")
             model = ollama.DEFAULT_MODEL
@@ -114,11 +120,11 @@ def render_eligibility(result: dict) -> None:
         st.caption(f"{ZONES.get(result['zone'], result['zone'])} · catégorie de ménage {result['categorie']}"
                    + (" (jeune ménage)" if result.get("jeune_menage") else ""))
         rows = [{"Plafond": kind.upper(), "Montant": f"{amount:,.0f} €".replace(",", " "),
-                 "Revenu déclaré": f"{result['revenu']:,.0f} €".replace(",", " "),
+                 "Revenu déclaré": f"{result['revenu_fiscal_reference']:,.0f} €".replace(",", " "),
                  "Éligible": "oui" if result["eligible"][kind] else "non"}
                 for kind, amount in result["plafonds"].items()]
         st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-        st.markdown(f"→ {result['verdict']}  [source]({result['source']})")
+        st.markdown(f"→ {result['verdict']}  [source]({result['provenance']['source_url']})")
 
 
 def render_response(response: AssistantResponse) -> None:
@@ -147,7 +153,10 @@ def render_response(response: AssistantResponse) -> None:
     m[1].metric("Tokens entrée", f"{response.tokens_in:,}".replace(",", " "))
     m[2].metric("Tokens sortie", f"{response.tokens_out:,}".replace(",", " "))
     m[3].metric("Appels LLM / outils", f"{response.llm_calls} / {len(response.tool_calls)}")
-    m[4].metric("Coût", f"{response.cost_eur:.4f} €", help="0 € : modèle local")
+    if response.cost_usd is not None:
+        m[4].metric("Coût", f"{response.cost_usd:.4f} $", help="coût réel renvoyé par l'API")
+    else:
+        m[4].metric("Coût", f"{response.cost_eur:.4f} €", help="0 € : modèle local")
 
     with st.expander("Trace de l'agent"):
         if response.latency_breakdown_ms:
@@ -200,6 +209,8 @@ with tab_chat:
                 options = {"k": k, "retriever": retriever}
                 if model:
                     options["model"] = model
+                if provider:
+                    options["provider"] = provider
                 try:
                     response = ask(question, backend=backend, **options)
                 except Exception as error:  # l'UI ne doit jamais planter en démo

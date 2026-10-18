@@ -73,3 +73,11 @@ class AssistantResponse(BaseModel):
     latency_ms: float = 0.0
     latency_breakdown_ms: dict[str, float] = Field(default_factory=dict)
     cost_eur: float = 0.0
+    cost_usd: float | None = Field(
+        default=None,
+        description="Coût réel facturé, tel que renvoyé par l'API (OpenRouter) ; None en local.",
+    )
+    prompt_version: str | None = Field(
+        default=None,
+        description="Empreinte du prompt système utilisé (traçabilité des runs).",
+    )

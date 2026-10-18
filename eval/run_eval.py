@@ -3,7 +3,8 @@
     uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 
 Options utiles :
-    --backend baseline|rag|agent   (défaut : agent)
+    --backend baseline|rag|agent|agent_tools   (défaut : agent)
+    --provider openrouter|ollama   (agent_tools uniquement, défaut : configs/agent.yaml)
     --retriever hybrid|hybrid_norerank|bm25
     --model qwen3:4b-instruct      (tout modèle Ollama)
     --judge                        juge LLM : correct / partiel / incorrect vs réponse de référence
@@ -89,10 +90,20 @@ def score_question(row: dict, response: AssistantResponse) -> dict:
     return metrics
 
 
-def judge(row: dict, response: AssistantResponse, model: str) -> dict:
-    from pydantic import BaseModel
+VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {"type": "string", "enum": ["correct", "partial", "incorrect"]},
+        "justification": {"type": "string"},
+    },
+    "required": ["verdict", "justification"],
+    "additionalProperties": False,
+}
 
-    from src.agent import ollama
+
+def judge(row: dict, response: AssistantResponse, model: str, provider: str = "ollama") -> dict:
+    """Juge LLM : Ollama (local) ou OpenRouter (API, coût réel enregistré)."""
+    from pydantic import BaseModel
 
     class Verdict(BaseModel):
         verdict: str
@@ -100,16 +111,24 @@ def judge(row: dict, response: AssistantResponse, model: str) -> dict:
 
     payload = {"question": row["question"], "reference": row["answer"], "reponse": response.answer,
                "abstention_attendue": row["should_abstain"]}
-    result = ollama.chat(
-        [{"role": "system", "content": JUDGE_PROMPT}, {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
-        model=model, schema={**Verdict.model_json_schema(), "properties": {
-            "verdict": {"type": "string", "enum": ["correct", "partial", "incorrect"]},
-            "justification": {"type": "string"}}},
-    )
-    verdict = Verdict.model_validate_json(result.content)
+    messages = [{"role": "system", "content": JUDGE_PROMPT},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
+    cost_usd = None
+    if provider == "openrouter":
+        from src.agent.llm import build_client
+
+        result = build_client("openrouter", model).complete_json(messages, VERDICT_SCHEMA, "verdict")
+        content, tokens_in, tokens_out, cost_usd = result.content, result.tokens_in, result.tokens_out, result.cost_usd
+    else:
+        from src.agent import ollama
+
+        result = ollama.chat(messages, model=model, schema=VERDICT_SCHEMA)
+        content, tokens_in, tokens_out = result.content, result.tokens_in, result.tokens_out
+    verdict = Verdict.model_validate_json(content)
     return {"judge_verdict": verdict.verdict, "judge_reason": verdict.justification,
             "judge_score": {"correct": 1.0, "partial": 0.5}.get(verdict.verdict, 0.0),
-            "judge_tokens_in": result.tokens_in, "judge_tokens_out": result.tokens_out}
+            "judge_model": model, "judge_tokens_in": tokens_in, "judge_tokens_out": tokens_out,
+            "judge_cost_usd": cost_usd}
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -145,6 +164,15 @@ def aggregate(records: list[dict]) -> dict:
         "tokens_out_total": sum(r["tokens_out"] for r in records),
         "tool_calls_total": sum(len(r["tool_calls"]) for r in records),
         "cost_eur_total": round(sum(r["cost_eur"] for r in records), 6),
+        # Coût réel renvoyé par l'API (backend agent_tools via OpenRouter) ; None en local.
+        "judge_cost_usd_total": (
+            round(sum(r["metrics"].get("judge_cost_usd") or 0 for r in records), 6)
+            if any(r["metrics"].get("judge_cost_usd") is not None for r in records) else None
+        ),
+        "cost_usd_total": (
+            round(sum(r["cost_usd"] for r in records if r.get("cost_usd") is not None), 6)
+            if any(r.get("cost_usd") is not None for r in records) else None
+        ),
     }
 
 
@@ -159,7 +187,8 @@ def summary_markdown(summary: dict, title: str) -> str:
     lat = summary["latency_ms"]
     lines += ["", f"Latence : moyenne {lat['mean']:.0f} ms, p50 {lat['p50']:.0f} ms, p95 {lat['p95']:.0f} ms",
               f"Tokens : {summary['tokens_in_total']} in / {summary['tokens_out_total']} out | "
-              f"appels d'outils : {summary['tool_calls_total']} | coût : {summary['cost_eur_total']:.4f} €"]
+              f"appels d'outils : {summary['tool_calls_total']} | coût : {summary['cost_eur_total']:.4f} €"
+              + (f" | coût API : {summary['cost_usd_total']:.4f} $" if summary.get("cost_usd_total") is not None else "")]
     return "\n".join(lines) + "\n"
 
 
@@ -186,16 +215,24 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=ROOT / "eval")
     parser.add_argument("--backend", choices=BACKENDS, default="agent")
     parser.add_argument("--retriever", choices=["hybrid", "hybrid_norerank", "bm25"], default=None)
-    parser.add_argument("--model", default=None, help="modèle Ollama (défaut : OLLAMA_MODEL ou qwen3:4b-instruct)")
+    parser.add_argument("--model", default=None, help="modèle Ollama (défaut : OLLAMA_MODEL ou qwen3:4b-instruct), "
+                        "ou modèle du fournisseur pour agent_tools")
+    parser.add_argument("--provider", choices=["openrouter", "ollama"], default=None,
+                        help="fournisseur du backend agent_tools (défaut : configs/agent.yaml)")
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--split", choices=["dev", "test"])
     parser.add_argument("--limit", type=int)
     parser.add_argument("--judge", action="store_true")
     parser.add_argument("--judge-model", default=None)
+    parser.add_argument("--judge-provider", choices=["ollama", "openrouter"], default="ollama",
+                        help="fournisseur du juge ; avec openrouter, --judge-model est obligatoire")
     parser.add_argument("--run-name")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--compare", action="store_true")
     args = parser.parse_args()
+
+    if args.judge and args.judge_provider == "openrouter" and not args.judge_model:
+        parser.error("--judge-provider openrouter exige --judge-model (ex. google/gemini-2.5-flash)")
 
     runs_dir = args.out / "runs"
     if args.compare:
@@ -211,6 +248,8 @@ def main() -> None:
         options["retriever"] = args.retriever
     if args.model and args.backend != "baseline":
         options["model"] = args.model
+    if args.provider and args.backend == "agent_tools":
+        options["provider"] = args.provider
 
     args.out.mkdir(parents=True, exist_ok=True)
     results_path = args.out / "results.jsonl"
@@ -220,7 +259,7 @@ def main() -> None:
     records = [done[r["id"]] for r in rows if r["id"] in done]
     mode = "a" if args.resume else "w"
 
-    if args.backend == "rag" or args.backend == "agent":
+    if args.backend in ("rag", "agent", "agent_tools"):
         from src.agent.retrieval import get_search
 
         get_search(options.get("retriever", "hybrid"))("échauffement logement social", k=1)  # charge les modèles
@@ -250,11 +289,13 @@ def main() -> None:
                 "warnings": response.warnings, "backend": response.backend, "model": response.model,
                 "llm_calls": response.llm_calls,
                 "cost_eur": (response.tokens_in * PRICE_IN + response.tokens_out * PRICE_OUT) / 1e6,
+                "cost_usd": response.cost_usd, "prompt_version": response.prompt_version,
                 "metrics": metrics,
             }
             if args.judge and row["answer"]:
                 try:
-                    record["metrics"].update(judge(row, response, args.judge_model or options.get("model") or _ollama.DEFAULT_MODEL))
+                    judge_model = args.judge_model or options.get("model") or _ollama.DEFAULT_MODEL
+                    record["metrics"].update(judge(row, response, judge_model, args.judge_provider))
                 except Exception as error:
                     record["judge_error"] = str(error)
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
