@@ -252,6 +252,8 @@ data/raw/dvf/*
 !data/raw/dvf/.gitkeep
 data/raw/plafonds/*
 !data/raw/plafonds/.gitkeep
+data/raw/cog/
+*.part
 
 # Index / embeddings / caches
 data/indexes/*
@@ -269,6 +271,10 @@ data/processed/*.feather
 # Évaluation : sorties générées
 eval/out/
 eval/results.jsonl
+# Sorties du dernier run (recréées à chaque fois) ; les copies durables sont dans eval/runs/<nom>/
+eval/summary.json
+eval/summary.md
+eval/tmp_check/
 eval/results_*.jsonl
 
 # Modèles / caches Hugging Face / Ollama locaux

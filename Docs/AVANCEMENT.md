@@ -109,7 +109,8 @@
 - [x] Répartition actuelle : **18 RAG**, **1 hors périmètre**, **1 prompt injection**.
 - [x] Les questions RAG sont ancrées sur des identifiants Service-Public réels.
 - [x] Les cas d'éligibilité, RPLS et DVF non encore vérifiables sont conservés dans `eval/golden_backlog_pending.jsonl`.
-- [ ] Étendre progressivement vers environ 40 questions après intégration de LEGI, des plafonds, de RPLS et de DVF.
+- [x] Golden set v2 (Gaby) retenu le 17 octobre : **52 questions**, splits `dev` / `test`, champs `expected_tool`, `should_abstain`, `expected` (la v1 enrichie d'Alexis, 33 questions, est abandonnée).
+- [ ] Étendre progressivement vers environ 40 questions (notamment des questions ciblant des articles LEGI).
 - [ ] Couvrir :
   - factuel RAG ;
   - éligibilité ;
@@ -152,26 +153,31 @@
 
 ### Outils déterministes
 
-- [ ] Télécharger les plafonds PLAI / PLUS / PLS.
-- [ ] Implémenter `check_eligibility`.
-- [ ] Écrire des tests unitaires sur plusieurs configurations de foyer.
-- [ ] Télécharger / préparer RPLS.
-- [ ] Implémenter `social_housing_stats`.
-- [ ] Télécharger / préparer DVF.
-- [ ] Implémenter `market_prices`.
-- [ ] Toujours renvoyer l'année et la source des données.
+- [x] Télécharger les plafonds PLAI / PLUS / PLS : barème 2026 saisi dans `data/processed/plafonds_hlm_2026.csv` (ANIL pour PLAI/PLUS, Service-Public F869 pour PLS).
+- [x] Implémenter `check_eligibility` (`src/tools/eligibility.py`).
+- [x] Écrire des tests unitaires sur plusieurs configurations de foyer (`tests/test_tools.py`).
+- [x] Télécharger / préparer RPLS (`src/ingestion/rpls.py`, `src/preprocessing/build_rpls_stats.py` → `data/processed/rpls_communes.csv`).
+- [x] Implémenter `social_housing_stats` (`src/tools/social_housing.py`).
+- [x] Télécharger / préparer DVF (`src/ingestion/dvf.py`, `src/preprocessing/build_dvf_stats.py` → `data/processed/dvf_communes.csv`).
+- [x] Implémenter `market_prices` (`src/tools/market_prices.py`).
+- [x] Toujours renvoyer l'année et la source des données (`provenance` + `caveats` dans chaque sortie).
+- [x] Valider strictement les entrées des outils contre la prompt injection (`tests/test_tool_security.py`).
 
 ### Agent
 
-- [ ] Définir les descriptions des outils.
-- [ ] Implémenter le routage de l'agent.
-- [ ] Vérifier que :
+- [x] Définir les descriptions des outils (`prompts/tool_descriptions.yaml`).
+- [x] Implémenter le routage de l'agent (tool calling, `src/agent/agent.py`, backends OpenRouter et Ollama).
+- [x] Vérifier que :
   - question documentaire → `search_docs` ;
   - éligibilité → `check_eligibility` ;
   - statistiques HLM → `social_housing_stats` ;
   - marché immobilier → `market_prices`.
-- [ ] Tracer les appels d'outils.
-- [ ] Mesurer l'exactitude du routage.
+  (routage exact 0,91, rappel 1,00 sur 33 questions avec `openai/gpt-4.1-mini`)
+- [x] Tracer les appels d'outils (`AssistantResponse.tool_calls`, contrat commun).
+- [x] Mesurer l'exactitude du routage (`routing_ok` dans `eval/run_eval.py`, backend `agent_tools`).
+- [x] Garde-fous contre la prompt injection (parsing strict, registre fermé, quotas, sorties assainies, citations validées, ancrage des chiffres) : `tests/test_agent.py`, `tests/test_tool_security.py`.
+- [x] Valider `agent_tools` avec Ollama / `qwen3:4b-instruct` (18 octobre, MacBook Air M2 8 Go) : API native `/api/chat`, contexte 8 192, repli par sortie structurée.
+- [ ] Run d'évaluation complet en local (`--provider ollama`) pour la comparaison local vs API.
 
 ### Évaluation complète
 
@@ -320,6 +326,68 @@ Chaque mise à jour doit préciser :
 Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]` tant qu'elle n'a pas été effectivement exécutée ou confirmée.
 
 ## 7. Journal chronologique
+
+### 18 octobre 2026 — runs OpenRouter jugés, compatibilité Ollama (branche `alexis`)
+
+- **Juge via OpenRouter** : `run_eval.py --judge --judge-provider openrouter --judge-model google/gemini-2.5-flash` (sortie JSON stricte, coût du juge enregistré). Le juge est d'une autre famille que les modèles évalués, pour limiter le biais d'auto-préférence (Zheng et al., 2023, arXiv:2306.05685). Environ 0,014 $ par run de 50 questions.
+- **Runs `agent_tools`** (50 questions, `eval/runs/`) :
+  - `openai/gpt-4.1-mini` : justesse **0,89** (42 correctes, 5 partielles, 3 incorrectes : q024, q029, q047), Hit@5 0,94 / 0,59, abstention 0,94, éligibilité exacte 1,00, 0,086 $ ;
+  - `mistralai/mistral-small-3.2-24b-instruct` : justesse 0,85, routage 0,98, 0,037 $ ; **plafonds inventés** dans 2 réponses d'éligibilité sur 5 (q031 : « éligible au PLUS » à 30 000 € à Paris, faux) — signalés par `unsupported_number` mais réponse fausse ;
+  - `qwen/qwen3-30b-a3b-instruct-2507` : justesse 0,61, abstention 0,66, 28 s par question ; tool calling erratique (46 appels répétés, 32 communes inventées refusées, 12 questions RAG en limite d'étapes).
+- **Incident** : le Mac d'Alexis (**MacBook Air M2, 8 Go**, et non le MacBook Pro 16 Go de référence) a subi un *kernel panic* (watchdog, swap saturé : disque à 98 %) pendant qu'Ollama, un run d'évaluation et un test tournaient en parallèle. Règle retenue : un seul processus lourd à la fois sur une machine à 8 Go. Le run Mistral interrompu a été relancé.
+- **Compatibilité Ollama** (Ollama 0.40.6, `qwen3:4b-instruct`) :
+  1. *Contexte* : l'endpoint compatible OpenAI `/v1` ignore `num_ctx` et applique le contexte du serveur (4 096 tokens par défaut ici) ; le 2e tour de l'agent (5 205 tokens) était refusé (erreur 400). Le fournisseur `ollama` passe désormais par l'API native `/api/chat` (client de Gaby, `OLLAMA_NUM_CTX` = 8 192 par requête).
+  2. *Réponse finale* : le modèle 4B répond en texte libre au lieu d'appeler `final_answer` (citations perdues). Repli : reformulation en sortie JSON contrainte par le schéma de la réponse finale, puis validation habituelle.
+  3. *Erreurs* : les erreurs Ollama sont gérées comme les erreurs d'API ; pas de contrôle d'ancrage des chiffres sur un message d'erreur.
+  - Vérification sur 8 questions : `agent_tools` (Dalo cité F18005, éligibilité, DVF Villeurbanne 3 567 €/m², demande de précision, refus d'injection), `agent` (RPLS Créteil via `social_housing_stats`, éligibilité) et `rag` corrects ; 9 à 75 s par question. Reste : le refus d'injection n'est pas marqué comme abstention.
+- **Tests** : 182 tests hors intégration (+ adaptateur Ollama, repli structuré, juge) et 1 test d'intégration OpenRouter.
+
+### 17 octobre 2026 — intégration de `main` et de `gaby-ui` dans la branche `alexis`
+
+- **Intégration** : `main` (RAG validé, PR #1) puis `gaby-ui` (golden v2, `run_eval.py`, contrat `AssistantResponse`, agent local, UI Streamlit) intégrés en avance rapide ; travail d'Alexis réappliqué par-dessus, non commité. Golden set : **v2 de Gaby conservée telle quelle** (les 13 questions outils de la v1 d'Alexis sont abandonnées).
+- **Contrat unique `AssistantResponse`** : l'agent à outils d'Alexis devient le backend **`agent_tools`** de `ask()` (`src/agent/tool_agent.py`) ; `AgentResult` et `eval/eval_agent.py` sont retirés. Ajout rétrocompatible de deux champs optionnels : `cost_usd` (coût réel OpenRouter) et `prompt_version`. `run_eval.py` : option `--provider`, `cost_usd` enregistré et totalisé. UI : choix du fournisseur pour `agent_tools`, coût API affiché.
+- **`check_eligibility` unifié** (implémentation d'Alexis, conventions de Gaby) : zones et financements en minuscules, sortie `categorie` / `plafonds` / `eligible` / `verdict` ; entrée `HouseholdSituation` (en couple, âges, personnes à charge) pour tous les agents ; `EligibilityError` = `ToolError` (sous-classe de `ValueError`). Les 11 tests de Gaby passent sans modification.
+- **Comparaison des deux implémentations** (170 cas) : 104 divergences, dont des erreurs de zone de l'ancienne version (zone limitrophe décidée sur le seul nom) — Saint-Denis (11) et « Montreuil, 62 » classés « Paris et communes limitrophes » ; Quimper, Saint-Malo et « Saint-Ouen-sur-Seine » refusés (table de 23 villes). Divergence d'interprétation : personne seule + 1 personne à charge + handicap = catégorie 3 (lecture littérale des définitions, retenue) contre 4 ; à confirmer sur Légifrance. Écart de 1 € sur le PLS au-delà de 6 personnes (ordre arrondi / supplément). Tests de non-régression ajoutés.
+- **Outils RPLS / DVF branchés sur l'agent local de Gaby** (`stats_tools()` pointe vers `social_housing_stats` et `market_prices`).
+- **Défauts trouvés à l'évaluation `agent_tools` et corrigés** :
+  1. *Calcul confié au LLM* : `jeune_menage=true` pour un couple de 40 + 38 ans (q033 : catégorie 3 au lieu de 2, PLS annoncé à tort). Le LLM fournit désormais les âges, Python calcule.
+  2. *Filtre de source* : 50 recherches sur 53 restreintes à Service-Public par le modèle (Hit@5 LEGI = 0,14). `search_docs` n'expose plus que la requête.
+  3. *Commune inventée* : « Paris » ajouté à « Je gagne 25 000 €, ai-je droit à un HLM ? » (q035, q052) dès que la commune est devenue obligatoire. Une commune absente de la question est désormais refusée par l'exécuteur.
+  4. *Messages d'erreur* : les erreurs de nos validateurs sont renvoyées en clair au modèle (au lieu de « value_error »).
+- **Résultats `run_eval.py`** (50 questions, `openai/gpt-4.1-mini`, run `eval/runs/agent_tools_gpt41mini/`) : Hit@5 **1,00** (dev) / **0,59** (test, baseline BM25 0,35) ; MRR 0,89 / 0,43 ; abstention correcte **0,94** ; routage **0,94** ; éligibilité exacte **1,00** (5/5) ; citations inventées **0** ; chiffres non ancrés **0** ; erreurs **0** ; latence p50 4,1 s, p95 4,9 s ; 340 712 tokens in / 10 037 out ; **0,066 $**.
+- **Erreurs restantes** : q019 (disponibilité à Créteil), q039 (montant exact de l'APL) et q042 (causalité HLM / délinquance) : la réponse dit bien que les données ne permettent pas de conclure, mais `abstained=false` ; q035 et q052 : demande de précision correcte, mais `routing_ok=0` car la métrique compte l'appel tenté puis refusé par le garde-fou. RAG test : Hit@5 0,59, à améliorer côté retrieval (F869, articles LEGI).
+- **Branche `charles`** (non intégrée) : un `src/agent/rag.py` différent de celui de Gaby (`RAGResponse`), à réconcilier par l'équipe.
+- **Tests** : 178 tests hors intégration (dont 17 de Gaby) ; ruff sans nouvelle alerte sur les fichiers de Gaby modifiés.
+
+### 13 octobre 2026 — agent (branche `alexis`)
+
+- **Architecture** : boucle de tool calling (`src/agent/agent.py`) ; un client compatible OpenAI pour deux backends (`openrouter` : `openai/gpt-4.1-mini`, `temperature 0`, `seed 42` ; `ollama` : `qwen3:4b`). Réponse finale via un pseudo-outil `final_answer` validé par Pydantic. Configuration dans `configs/agent.yaml`, secret `OPENROUTER_API_KEY` dans `.env` uniquement (`.env.example` ajouté).
+- **Prompts** : `prompts/system.md.j2` + `final_answer.md.j2` (Markdown gabarisé Jinja2, `StrictUndefined`), descriptions d'outils dans `prompts/tool_descriptions.yaml`. Seules des variables de configuration sont rendues ; la question et les sorties d'outils restent dans des messages séparés. `prompt_version` (SHA-256) est enregistré dans chaque résultat.
+- *(Remplacé le 17 octobre par le contrat commun `AssistantResponse`, voir ci-dessus.)* **Contrat de sortie** `AgentResult` : réponse, citations (titre/URL remplis depuis le corpus), citations retirées, documents récupérés, appels d'outils, tokens, latence, coût (`usage.cost` d'OpenRouter), raison d'arrêt, abstention, `injection_suspected`, `ungrounded_numbers`. C'est la ligne attendue par `eval/run_eval.py`.
+- **Évaluation** (`eval/eval_agent.py`, retiré le 17 octobre au profit de `eval/run_eval.py` ; golden v1, 33 questions, prompt `4757880a1880`) : routage exact **0,91** (rappel 1,00, précision 0,91) ; documents attendus récupérés **0,87** ; citations inventées **0** ; réponses avec chiffres non ancrés **0** ; abstention sur questions sans réponse **0,67** ; `final_answer` atteint **100 %** ; latence moyenne **4,5 s** (p95 6,4 s) ; ~5 550 tokens en entrée et ~190 en sortie par question ; coût total **0,047 $**.
+- **Analyse d'erreurs** :
+  1. *Département inventé (Saint-Denis → « 93 »)* : gpt-4.1-mini complète l'argument `departement` même quand la question ne le donne pas ; une consigne de prompt ne suffit pas. Corrigé en Python : un département absent de la question est retiré si la commune est homonyme, et l'outil renvoie les candidats.
+  2. *Bug de ponctuation (q027)* : « Saint-Denis, en Seine-Saint-Denis, … » — la virgule empêchait de reconnaître le département. Corrigé + test de non-régression.
+  3. *Dates inventées (q003, q004, q006)* : « ces informations sont valables en 2024 », détecté par le contrôle d'ancrage des chiffres. Corrigé par une consigne explicite ; 0 occurrence ensuite.
+  4. *Abstention sous-déclarée (q019, q032)* : la réponse explique bien l'absence de données (disponibilité, loyers), mais avec `abstained=false`, et q032 met en avant des prix de vente. Consigne précisée ; reste 2 cas.
+  5. *Routage « en trop » (q019, q032, q033)* : le modèle appelle RPLS/DVF pour donner du contexte alors que le golden set attend 0 outil. Comportement défendable : à arbitrer (étiquettes du golden set vs consigne).
+  6. *Homonymie Montreuil (q023)* : Montreuil existe dans 4 départements ; l'agent demande la précision au lieu de supposer le 93 attendu par le golden set. Choix de sûreté (une mauvaise zone donnerait de mauvais plafonds), à arbitrer.
+  7. *Retrieval (q005, q017, q025)* : la fiche F869 (plafonds, très longue, tableaux aplatis) ne remonte pas, même avec k = 5 sur les requêtes reformulées par le modèle. Point à traiter côté retrieval/chunking.
+- **Sécurité** : à l'écriture des expressions régulières, des caractères invisibles (U+200B…U+FEFF) s'étaient glissés littéralement dans `guards.py` ; réécrits en séquences d'échappement et contrôle ajouté.
+- **Tests** : 145 tests hors intégration (dont 20 pour l'agent avec un LLM scripté, 52 de sécurité) + 1 test d'intégration OpenRouter (`uv run pytest -m integration`).
+- **Non fait** : backend Ollama non exécuté (Ollama absent de la machine d'Alexis) ; `eval/run_eval.py` et le jugement de la justesse des réponses restent à faire.
+
+### 13 octobre 2026 — outils déterministes (branche `alexis`)
+
+- **Configuration** : paramètres non secrets dans `configs/tools.yaml`, chemins fixes dans `src/config.py`, réglages typés dans `src/settings.py` (pydantic-settings : YAML < `.env` < variables `HLM_*`). `src/retrieval/config.py` n'est pas modifié.
+- **Référentiel des communes** : COG Insee 2026 → `data/processed/communes_ref.csv` (34 875 communes, 45 arrondissements, 2 576 communes déléguées/associées en alias). Le résolveur (`src/tools/communes.py`) gère accents, « St », homonymes (erreur `AmbiguousCommune` avec candidats), arrondissements et codes Insee.
+- **`check_eligibility`** : barème 2026 (arrêté du 19 décembre 2025, JO du 24 décembre 2025), 3 zones × PLAI/PLUS/PLS × catégories 1–6 + personne supplémentaire. Les catégories de ménage suivent l'arrêté du 29 juillet 1987 ; les définitions ne se cumulent pas (au plus n + 1). DOM non couverts (`DataNotCovered`).
+- **Constat** : les montants affichés par Service-Public F869 (ex. 34 996 € pour 1 personne à Paris) sont les plafonds **PLS**, pas PLUS. Contrôles : PLS = round(1,3 × PLUS) sur les 21 valeurs, et tous les plafonds PLS saisis figurent dans le texte de F869 du corpus (test automatique).
+- **Cas réel** : Pierrefitte-sur-Seine est une commune déléguée de Saint-Denis (93066) depuis 2025 ; elle hérite de la zone « Paris et communes limitrophes », avec un avertissement.
+- **RPLS** : le seul fichier public est le fichier détaillé au logement (5 416 826 logements au 1er janvier 2025, téléchargé via DiDo avec 10 colonnes). Il ne contient **ni vacance, ni loyers, ni occupation** : l'outil donne la composition du parc (financement initial regroupé, type, taille, surface, part en QPV, ancienneté, DPE). 16 846 communes, 0 code orphelin. Ex. : Créteil 15 133 logements, Paris 250 640.
+- **DVF** : geo-dvf 2024 et 2025, France entière, agrégé avec DuckDB en ~6 s. Seules les ventes d'un logement unique sont retenues (715 750 en 2024, 808 825 en 2025) ; 554 ventes écartées (6 codes communes absents du COG). Ex. 2025 : Paris appartements 9 700 €/m², Lyon 4 467 €/m², Créteil 3 634 €/m². Alsace-Moselle et Mayotte : `DataNotCovered`.
+- **Tests** : 88 nouveaux tests (outils + sécurité des entrées), 110/110 avec le retrieval.
+- **Prochaine action** : agent (OpenRouter + Ollama), registre d'outils, garde-fous, prompts Jinja2.
 
 ### 13 octobre 2026 — retrieval final : hybride RRF + reranker, `search_docs`
 
@@ -595,6 +663,24 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Clarification : le chunking documentaire n'est pas encore réalisé.
 - Ajout de la règle de mise à jour régulière de ce fichier.
 
+### 15 octobre 2026 — golden set v2, run_eval, agent et interface (Gaby)
+
+- Golden set porté à **52 questions** avec deux splits : `dev` (q001-q020, ayant servi aux choix du retrieval, texte inchangé) et `test` (q021-q052, **held-out**).
+- Nouveaux types : 10 questions en langage courant (dont 6 « jumeaux » de questions dev, champ `twin_of`), 7 questions sur les articles LEGI (0 auparavant), 5 cas d'éligibilité calculés à la main depuis l'arrêté du 19/12/2025, 2 demandes de précision, 2 RPLS/DVF (`pending_data`), 2 hors périmètre, 2 injections, 2 pièges causaux.
+- Nouveaux champs : `split`, `acceptable_docs` (documents qui contiennent aussi la réponse, comptés pour Hit@k/MRR), `expected_tool`, `should_abstain`, `expected`.
+- `eval/check_golden.py` : intégrité (ids, types, documents présents dans le corpus). BM25 seul : Hit@5 = 1,00 sur `dev` (18 questions) mais **0,47 sur `test`** (17 questions) ; le split `test` discrimine enfin les méthodes de retrieval.
+- Constat données : la fiche F869 affiche les plafonds **PLS** (PLUS x 1,3) et ses tableaux sont aplatis par le parser (montants sans libellé de catégorie) ; d'où un outil déterministe plutôt qu'une lecture par le LLM.
+- `src/tools/eligibility.py` (+ 11 tests) : catégories de ménage, jeune ménage, handicap, 3 zones, PLAI / PLUS / PLS 2026.
+- `src/agent/` : contrat `AssistantResponse` commun ; backends `baseline` (BM25 sans LLM), `rag` (extrait du notebook, `think=False`, tokens, citation inventée supprimée et signalée au lieu d'une exception) et `agent` (tool calling Ollama, validation Pydantic des arguments, au plus 3 tours).
+- `eval/run_eval.py` : commande de l'énoncé, `results.jsonl` complet, `summary.md`, juge LLM optionnel, `--run-name` / `--compare` pour les ablations.
+- `app/streamlit_app.py` : réponse, sources, calcul d'éligibilité, métriques, trace de l'agent, onglet Évaluation.
+- Scripts d'évaluation du retrieval restreints au split `dev` par défaut (résultats de référence inchangés) ; `eval_retrieval.py test` pour le held-out.
+- Constat modèle (16 octobre) : le tag Ollama `qwen3:4b` pointe vers Qwen3-4B-**Thinking**-2507, qui raisonne toujours avant de répondre, même avec `--think=false` (testé sur le portable Windows de Gaby). Modèle par défaut changé pour `qwen3:4b-instruct` (Qwen3-4B-Instruct-2507, même taille). Test sans RAG : le modèle développe « HLM » en « Habitat Locatif Meublé » au lieu d'*Habitation à Loyer Modéré*, exemple de plus pour la soutenance.
+- Premiers essais réels (16 octobre, portable Windows sans GPU, qwen3:4b-instruct, environ 33 tokens/s en lecture et 10 tokens/s en génération) :
+  - **tool calling natif abandonné** : sur q001, le modèle n'a appelé aucun outil (0 appel, 511 tokens générés) puis s'est abstenu faute de sources. L'agent appelle désormais toujours `search_docs`, puis le LLM remplit un **formulaire JSON contraint** (action + situation du ménage) ; Python décide (outil ou demande de précision). Résultat sur q001 : F10007 au rang 1, cité, réponse correcte (164 s sur ce portable).
+  - **chiffre mal recopié** : en reformulant `check_eligibility` (q030), le modèle a écrit « 37 504 € » au lieu de 37 584 €, a étendu le barème à l'outre-mer et décrit le PLS comme « revenus élevés ». Correction : la réponse d'éligibilité est rédigée par Python à partir du résultat de l'outil (plus aucun chiffre ne passe par le LLM, un appel LLM en moins), et un détecteur signale tout nombre de 3 chiffres ou plus absent des sources (métrique `unsupported_number`).
+- Prochaine action : `ollama pull qwen3:4b-instruct`, lancer les runs réels sur le Mac, puis RPLS / DVF.
+
 ---
 
 ### 13 octobre 2026 — interface finale `search_docs` documentée
@@ -636,4 +722,4 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Les identifiants de citations sont contrôlés contre les documents effectivement récupérés ; le prompt traite le texte des sources comme des données, pas comme des instructions, et demande l'abstention lorsque les sources sont insuffisantes.
 - Contrôles initiaux : JSON du notebook valide et espaces Git propres. Le runtime Ollama n'avait pas encore été lancé dans cette session ; cette validation a été réalisée le 15 octobre.
 
-*Dernière mise à jour : 15 octobre 2026 — PR #1 mergée, RAG end-to-end validé ; prochaine étape : extraction vers `src/`, optimisation de la latence et `eval/run_eval.py`.*
+*Dernière mise à jour : 15 octobre 2026 — golden set v2 (52 questions), run_eval, agent et interface.*
