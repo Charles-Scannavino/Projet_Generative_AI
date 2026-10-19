@@ -680,3 +680,25 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 
 **Prochaine étape :** premier commit sur la branche dédiée,
 puis démonstration et documentation du client MCP externe.
+
+### 18 octobre 2026 — MCP Inspector : démonstration externe validée
+
+- Branche : `charles-bonus-mcp`.
+- Premier commit publié : `9144590`.
+- Client externe : MCP Inspector 2.9.0.
+- Connexion au serveur `assistant-hlm` via `stdio` : validée.
+- Outil découvert et exécuté : `search_docs`.
+- Question : « Qu'est-ce que le DALO ? »
+- Nombre de passages demandé : 5.
+- Nombre de passages retourné : 5.
+- Document retrouvé : `F18005` (Service-Public.fr).
+- Méthode : `hybrid_rrf+rerank`.
+- Latence observée : 9 068,57 ms.
+- Réponse structurée : identifiants, sources, URLs, textes et scores.
+- Le serveur MCP fournit des passages documentaires, sans génération de réponse par LLM.
+
+**Résultat :** fonctionnement du serveur MCP validé depuis
+une application cliente externe.
+
+**Suite :** documenter l'installation et faciliter la reproduction
+de la démonstration sur un autre ordinateur.
