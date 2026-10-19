@@ -1,0 +1,31 @@
+# Paramètres de l'agent. Les secrets (OPENROUTER_API_KEY) sont lus dans .env uniquement.
+# Surcharge possible par variable d'environnement, ex. HLM_AGENT__BACKEND=ollama
+
+agent:
+  backend: openrouter            # openrouter | ollama
+  temperature: 0
+  seed: 42
+  max_steps: 6                   # tours LLM maximum par question
+  max_calls_per_tool: 3          # quota d'appels par outil et par question
+  max_chunk_chars: 2000          # troncature des passages renvoyés au LLM
+  search_k: 5                    # passages renvoyés par search_docs par défaut
+  request_timeout_s: 120
+
+  backends:
+    openrouter:
+      base_url: https://openrouter.ai/api/v1
+      # Modèle compatible tool calling + tool_choice + seed (openrouter.ai/api/v1/models).
+      model: openai/gpt-4.1-mini
+      tool_choice: required
+      app_name: Assistant HLM
+    ollama:
+      # API native /api/chat via src/agent/ollama.py : hôte OLLAMA_HOST, contexte
+      # OLLAMA_NUM_CTX (8 192 par défaut, fixé à chaque requête). L'endpoint /v1
+      # imposerait le contexte du serveur (4 096 sur une machine à 8 Go).
+      model: qwen3:4b-instruct   # « qwen3:4b » = variante Thinking (lente)
+
+  # Repli si le fournisseur ne renvoie pas le coût (OpenRouter renvoie usage.cost).
+  # Relevé sur https://openrouter.ai/api/v1/models le 13 octobre 2026.
+  prices_usd_per_mtok:
+    "openai/gpt-4.1-mini": {input: 0.40, output: 1.60}
+    "qwen3:4b-instruct": {input: 0.0, output: 0.0}

@@ -206,7 +206,7 @@ Ablations attendues :
 - **Homebrew (`brew`) est installé** sur la machine locale.
 - L'environnement local du projet est maintenant géré avec **uv** et Python **3.12+**.
 - `pyproject.toml` et `uv.lock` sont versionnés à la racine du dépôt.
-- **Ollama est installé localement** et le modèle génératif de départ retenu est **`qwen3:4b`** (2,5 Go), exécuté sur le MacBook Pro M1 16 Go.
+- **Ollama est installé localement**. Modèle génératif : **`qwen3:4b-instruct`** (Qwen3-4B-Instruct-2507, 2,5 Go). Le tag `qwen3:4b` pointe vers la variante *Thinking*, qui raisonne toujours avant de répondre (cause probable des 67 à 138 s par question mesurées au départ).
 
 ### Finalisation
 Le notebook sert au prototypage, à l'exploration et aux expériences.
@@ -252,7 +252,7 @@ Projet_Generative_AI/
 │   └── agent/
 ├── eval/
 │   ├── golden.jsonl
-│   ├── golden_backlog_pending.jsonl
+│   ├── check_golden.py
 │   ├── run_eval.py
 │   └── metrics.py
 └── app/

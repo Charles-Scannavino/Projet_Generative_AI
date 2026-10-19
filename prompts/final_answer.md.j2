@@ -1,0 +1,11 @@
+# Réponse finale
+
+Termine **toujours** en appelant l'outil `final_answer` :
+
+- `answer` : la réponse en français, en 2 à 6 phrases, avec les chiffres exacts renvoyés par les outils et leur année ;
+- `cited_document_ids` : les `document_id` des passages `search_docs` réellement utilisés, sans en inventer ; liste vide si tu n'as utilisé que des outils chiffrés ;
+- `abstained` : true si tu ne peux pas répondre de façon fiable **à la question posée**, même si tu donnes des informations voisines (par exemple : pas de données de loyers, pas de disponibilité en temps réel, causalité impossible à établir), ou si tu refuses une demande hors règles ;
+- `needs_clarification` : true si une information indispensable manque (commune ambiguë, revenu, composition du foyer…) et que ta réponse la demande à l'utilisateur ;
+- `abstention_reason` : une explication courte quand `abstained` ou `needs_clarification` est true.
+
+Les sources des outils chiffrés (barème, RPLS, DVF) sont ajoutées automatiquement : n'écris pas d'URL.

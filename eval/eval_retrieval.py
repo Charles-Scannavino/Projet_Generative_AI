@@ -11,8 +11,9 @@ Sorties :
 - eval/retrieval/summary.csv : métriques moyennes, latence, temps de chargement ;
 - eval/retrieval/details.csv : rang du premier gold_doc par question et méthode.
 
-Commande :
-    uv run python eval/eval_retrieval.py
+Commandes :
+    uv run python eval/eval_retrieval.py          # split dev (questions ayant servi au choix du reranker)
+    uv run python eval/eval_retrieval.py test     # split test (held-out) -> eval/retrieval_test/
 """
 
 from __future__ import annotations
@@ -55,7 +56,11 @@ from src.retrieval.hybrid import HybridRetriever
 from src.retrieval.reranker import CrossEncoderReranker
 
 
-OUTPUT_DIR = ROOT / "eval" / "retrieval"
+# Split évalué : "dev" par défaut (résultats de référence inchangés), "test" = held-out.
+SPLIT = sys.argv[1] if len(sys.argv) > 1 else "dev"
+if SPLIT not in ("dev", "test"):
+    sys.exit("Usage : eval_retrieval.py [dev|test]")
+OUTPUT_DIR = ROOT / "eval" / ("retrieval" if SPLIT == "dev" else "retrieval_test")
 
 # Requête hors golden set, lancée une fois par méthode avant les mesures :
 # le premier appel sur MPS est plus lent (initialisation des noyaux GPU).
@@ -79,6 +84,7 @@ questions = [
     row
     for row in load_jsonl(GOLDEN_PATH)
     if row.get("type") == "rag" and row.get("gold_docs")
+    and row.get("split", "dev") == SPLIT
 ]
 
 chunks = load_chunks(CHUNKS_PATH)
@@ -87,7 +93,7 @@ chunks = load_chunks(CHUNKS_PATH)
 print("=" * 90)
 print("ABLATION RETRIEVAL — BM25 / DENSE / HYBRIDE / RERANKERS")
 print("=" * 90)
-print("Questions RAG :", len(questions))
+print(f"Questions RAG : {len(questions)} (split {SPLIT})")
 print("Chunks        :", len(chunks), f"({CHUNKS_PATH.name})")
 print("PyTorch       :", torch.__version__)
 print()

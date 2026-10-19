@@ -1,0 +1,86 @@
+# Paramètres des outils déterministes (check_eligibility, social_housing_stats,
+# market_prices). Les chemins sont relatifs à la racine du dépôt.
+# Surcharge possible par variable d'environnement, ex. HLM_TOOLS__DVF__MIN_VENTES=10
+
+tools:
+  communes:
+    path: data/processed/communes_ref.csv
+    millesime: 2026
+    source_name: "Insee — Code officiel géographique (COG) 2026"
+    source_url: https://www.insee.fr/fr/statistiques/fichier/8740222/v_commune_2026.csv
+    departements_url: https://www.insee.fr/fr/statistiques/fichier/8740222/v_departement_2026.csv
+
+  plafonds:
+    annee: 2026
+    # Revenu fiscal de référence de l'année N-2 (avis d'imposition N-1).
+    annee_revenus: 2024
+    path: data/processed/plafonds_hlm_2026.csv
+    source_name: "Arrêté du 29 juillet 1987 modifié par l'arrêté du 19 décembre 2025 (JO du 24 décembre 2025)"
+    source_url: https://www.anil.org/aj-plafonds-ressources-2026-logement-social/
+    # Le PLS est publié à part par Service-Public (= 130 % du PLUS, arrondi à l'euro).
+    pls_source_url: https://www.service-public.gouv.fr/particuliers/vosdroits/F869
+    # Communes limitrophes de Paris, telles que listées par Service-Public (F869).
+    # Résolues en codes Insee via le COG au moment du build : un nom introuvable
+    # fait échouer le build plutôt que de classer une commune dans la mauvaise zone.
+    communes_limitrophes:
+      - {nom: Aubervilliers, departement: "93"}
+      - {nom: Bagnolet, departement: "93"}
+      - {nom: Boulogne-Billancourt, departement: "92"}
+      - {nom: Charenton-le-Pont, departement: "94"}
+      - {nom: Clichy, departement: "92"}
+      - {nom: Fontenay-sous-Bois, departement: "94"}
+      - {nom: Gentilly, departement: "94"}
+      - {nom: Issy-les-Moulineaux, departement: "92"}
+      - {nom: Ivry-sur-Seine, departement: "94"}
+      - {nom: Joinville-le-Pont, departement: "94"}
+      - {nom: Le Kremlin-Bicêtre, departement: "94"}
+      - {nom: Les Lilas, departement: "93"}
+      - {nom: Le Pré-Saint-Gervais, departement: "93"}
+      - {nom: Levallois-Perret, departement: "92"}
+      - {nom: Malakoff, departement: "92"}
+      - {nom: Montreuil, departement: "93"}
+      - {nom: Montrouge, departement: "92"}
+      - {nom: Neuilly-sur-Seine, departement: "92"}
+      - {nom: Nogent-sur-Marne, departement: "94"}
+      - {nom: Pantin, departement: "93"}
+      - {nom: Puteaux, departement: "92"}
+      - {nom: Saint-Cloud, departement: "92"}
+      - {nom: Saint-Denis, departement: "93"}
+      - {nom: Saint-Mandé, departement: "94"}
+      - {nom: Saint-Maurice, departement: "94"}
+      # Renommée « Saint-Ouen-sur-Seine » en 2018 ; F869 écrit encore « Saint-Ouen ».
+      - {nom: Saint-Ouen-sur-Seine, departement: "93"}
+      - {nom: Suresnes, departement: "92"}
+      - {nom: Vanves, departement: "92"}
+      - {nom: Vincennes, departement: "94"}
+    departements_idf_hors_paris: ["77", "78", "91", "92", "93", "94", "95"]
+    # L'arrêté ne concerne pas les DOM (régime LLS distinct).
+    departements_non_couverts: ["971", "972", "973", "974", "976"]
+
+  rpls:
+    millesime: 2025
+    path: data/processed/rpls_communes.csv
+    raw_path: data/raw/rpls/rpls_2025.csv
+    source_name: "SDES — Répertoire des logements locatifs des bailleurs sociaux (RPLS) au 1er janvier 2025"
+    source_url: https://www.data.gouv.fr/datasets/donnees-detaillees-au-logement-du-repertoire-des-logements-locatifs-des-bailleurs-sociaux-rpls
+    download_url: https://data.statistiques.developpement-durable.gouv.fr/dido/api/v1/datafiles/f3c2f2cb-8fb1-40fd-8733-964247744c9a/csv
+    dido_millesime: "2025-01"
+    # Seules ces colonnes sont téléchargées (le fichier complet a ~80 colonnes).
+    columns: [DEPCOM, LIBCOM, DEP_CODE, FINAN_CODE, TYPECONST_CODE, NBPIECE, SURFHAB, CONSTRUCT, QPV_CODE, DPEENERGIE]
+
+  dvf:
+    annees: [2024, 2025]
+    path: data/processed/dvf_communes.csv
+    raw_dir: data/raw/dvf
+    source_name: "DGFiP — Demandes de valeurs foncières géolocalisées (DVF)"
+    source_url: https://www.data.gouv.fr/datasets/demandes-de-valeurs-foncieres-geolocalisees
+    download_url_template: https://files.data.gouv.fr/geo-dvf/latest/csv/{annee}/full.csv.gz
+    # En dessous, les statistiques communales sont masquées (échantillon insuffisant).
+    min_ventes: 5
+    surface_min_m2: 9
+    # Bornes larges : on écarte les erreurs de saisie et ventes atypiques
+    # (prix symboliques, lots mal surfacés), pas le haut de marché parisien.
+    prix_m2_min: 100
+    prix_m2_max: 50000
+    # Alsace-Moselle (livre foncier) et Mayotte ne sont pas couverts par DVF.
+    departements_non_couverts: ["57", "67", "68", "976"]

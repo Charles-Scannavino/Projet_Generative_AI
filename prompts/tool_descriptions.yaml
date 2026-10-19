@@ -1,0 +1,35 @@
+# Descriptions des outils telles que vues par le LLM : elles pilotent le routage.
+
+search_docs: >
+  Cherche dans les fiches Service-Public.fr et les articles du Code de la
+  construction et de l'habitation (LEGI) sur le logement social : demande de
+  logement social, Dalo, APL/ALF/ALS, surloyer, bail HLM, attribution,
+  expulsion, achat du logement… À utiliser pour toute question sur des droits,
+  des démarches ou des règles. Renvoie des passages à citer par leur document_id.
+
+check_eligibility: >
+  Compare le revenu d'un ménage aux plafonds de ressources du logement social
+  (PLAI, PLUS, PLS) pour une demande faite en France métropolitaine. N'appeler
+  que si le revenu, la composition du foyer et la commune sont connus ; sinon,
+  demander la précision (needs_clarification) sans appeler l'outil. Recopier
+  les faits de la question (revenu fiscal de référence total, nombre de
+  personnes, en couple ou non, personnes à charge, âges s'ils sont donnés,
+  handicap) : la catégorie de ménage et le critère « jeune ménage » sont
+  calculés par l'outil. Ne jamais calculer un plafond soi-même.
+
+social_housing_stats: >
+  Donne la composition du parc de logements sociaux d'une commune (répertoire
+  RPLS) : nombre de logements, financement initial (PLAI/PLUS/PLS/PLI), type de
+  construction, taille, surface moyenne, part en quartier prioritaire (QPV),
+  ancienneté, DPE. Ne renseigne PAS les logements disponibles, la vacance ni
+  les loyers.
+
+market_prices: >
+  Donne le prix de vente médian au m² des logements (maisons, appartements ou
+  les deux) d'une commune, avec les quartiles et le nombre de ventes (données
+  DVF). Ne renseigne PAS les loyers. L'Alsace-Moselle et Mayotte ne sont pas
+  couvertes.
+
+final_answer: >
+  Donne la réponse finale à l'utilisateur et termine. Toujours terminer par cet
+  outil, y compris pour une abstention ou un refus.

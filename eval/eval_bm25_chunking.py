@@ -95,6 +95,9 @@ questions = [
     if (
         row.get("type") == "rag"
         and row.get("gold_docs")
+        # Split dev uniquement : reproduit les résultats de référence
+        # (le split test est réservé à l'évaluation finale held-out).
+        and row.get("split", "dev") == "dev"
     )
 ]
 
