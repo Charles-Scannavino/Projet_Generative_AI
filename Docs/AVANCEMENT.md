@@ -788,3 +788,58 @@ une application cliente externe.
 
 **Suite :** documenter l'installation et faciliter la reproduction
 de la démonstration sur un autre ordinateur.
+
+### 19 octobre 2026 — intégration MCP et validations fonctionnelles
+
+- **Branche :** `charles-bonus-mcp-integration`
+- **Commit d'intégration :** `1319ab2`
+- **Version de main intégrée :** `580edc8`
+
+#### Intégration technique
+
+- Fusion des travaux MCP avec la version de main contenant les contributions d'Alexis et Gaby.
+- Conflits résolus dans `Docs/AVANCEMENT.md` et `uv.lock`.
+- Dépendances MCP, agent, RPLS, DVF et Streamlit conservées.
+- `uv lock --check` et `uv sync --locked` réussis.
+- Tests automatisés : **186 réussis, 1 désélectionné**, en 29,34 secondes.
+- Validation MCP réelle via un client `stdio` en sous-processus.
+- Outil découvert : `search_docs`.
+- Recherche DALO : 3 passages du document `F18005`, méthode `hybrid_rrf+rerank`, latence 8,3 s.
+- Branche d'intégration publiée sur GitHub.
+- Aucune modification apportée à `main`.
+
+#### Vérifications fonctionnelles via Streamlit
+
+- Interface Streamlit : lancement et affichage corrects.
+- Baseline BM25 : recherche DALO fonctionnelle.
+- Backend `rag` avec Ollama `qwen3:4b-instruct` : réponse DALO générée, citation `F18005`, latence 40,9 s.
+- Backend `agent` : appel réussi à `check_eligibility` pour un couple avec un enfant à Lyon et 28 000 euros de revenu fiscal.
+- Résultat éligibilité : PLAI non éligible ; PLUS et PLS éligibles.
+- RPLS Créteil : **15 133 logements sociaux**, millésime 2025, confirmés par appel Python direct.
+- DVF Créteil : 2024, 497 ventes et 3 548 euros/m² ; 2025, 608 ventes et 3 634 euros/m², confirmés par Python.
+- Demande de logements disponibles aujourd'hui à Créteil : abstention correcte, aucun logement inventé.
+- Backend `agent_tools` avec Ollama : recherche DALO, éligibilité et refus de divulgation du prompt système testés.
+- Dans certains tests `agent_tools`, mécanisme de secours utilisé lorsque Qwen3 n'appelle pas `final_answer`.
+
+#### Évaluation
+
+- `eval/check_golden.py` : 52 questions structurellement valides (20 dev, 32 test).
+- q036 (RPLS) et q037 (DVF) restent incomplètes et exclues des runs.
+- Évaluation baseline BM25 : 50 questions exécutées, aucune erreur.
+- Hit@5 baseline : 0,69 global ; 1,00 dev ; 0,35 test.
+- Latence médiane baseline : 2 ms.
+- Ces résultats valident l'exécution du pipeline, pas la justesse de toutes les réponses.
+
+#### Anomalies restant à traiter
+
+- Le backend `agent` associe parfois des citations juridiques non pertinentes aux résultats RPLS et DVF, malgré la provenance correcte renvoyée par les outils.
+- Sur une injection de prompt, le backend `agent` ne divulgue pas ses instructions, mais produit une réponse hors sujet au lieu d'un refus explicite.
+- Le backend `agent_tools` utilise parfois un repli de sortie structurée lorsque `final_answer` n'est pas appelé.
+- Lors du test d'éligibilité, `agent_tools` appelle aussi `social_housing_stats`, outil non nécessaire à cette question.
+- q036 demande le nombre de logements vacants, information absente du fichier RPLS utilisé : l'attente d'une réponse sans abstention doit être revue.
+- q037 nécessite une réponse de référence calculée à partir des appartements vendus à Villeurbanne en 2025.
+- Une évaluation end-to-end complète de la branche intégrée avec LLM reste à réaliser.
+
+**Conclusion :** intégration MCP techniquement fonctionnelle et tests majeurs réussis sur les scénarios exécutés. Les anomalies de qualité doivent être signalées à l'équipe avant la livraison finale.
+
+**Prochaines étapes :** finaliser `Docs/MCP.md`, transmettre les anomalies à Alexis, préparer une pull request pour revue et ne fusionner dans `main` qu'après validation de l'équipe.
