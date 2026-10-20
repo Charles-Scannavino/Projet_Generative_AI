@@ -14,7 +14,7 @@
 
 **Soutenance :** une **vidéo de secours de Streamlit a été enregistrée** ; une **démonstration Streamlit en direct est prévue le 21 octobre 2026**. La vidéo servira de repli en cas de problème technique ou de latence.
 
-**Travaux ouverts ou facultatifs :** évaluation exhaustive de `agent_tools` en local, comparaison DINUM, audit explicite des secrets, analyse d'une variante de chunking structurelle et connexion éventuelle à un client MCP conversationnel externe.
+**Travaux ouverts ou facultatifs :** évaluation exhaustive de `agent_tools` en local, comparaison DINUM, analyse d'une variante de chunking structurelle et connexion éventuelle à un client MCP conversationnel externe. **Contrôle sécurité exécuté :** 20 alertes historiques Gitleaks restent à qualifier, sans conclusion d'exposition de clés réelles.
 
 **Échéances :** gel du code le 20 octobre 2026 à 23 h 59 (tag `v1.0` créé) ; soutenance le 21 octobre 2026.
 
@@ -196,7 +196,7 @@ En complément du périmètre principal, deux pistes peuvent apporter une valeur
 - [x] Documenter les noms et les principales configurations des modèles retenus dans `README.md`.
 - [x] Ajouter `.env.example` (fichier présent dans le dépôt).
 - [x] `.gitignore` adapté au projet (Python/Colab, données extraites, index, résultats d'évaluation, secrets).
-- [ ] Vérifier qu'aucune clé API n'est présente.
+- [x] Effectuer un contrôle de sécurité des fichiers suivis et de l'historique Git : `.env` ignoré, aucun fichier secret évident suivi par Git, scan Gitleaks réalisé sur 128 commits. **Résultat : 20 alertes `generic-api-key` dans cinq anciens XML Service-Public, non encore qualifiées ; l'absence totale de secrets n'est pas certifiée.**
 - [x] Préparer et enregistrer une vidéo de secours Streamlit ; démonstration en direct prévue à l'oral du 21 octobre (confirmé par le présentateur).
 - [x] Créer et publier le tag `v1.0` (cible vérifiée : commit `24702f` ; le commit `32ec0a3` correspond à l'intégration du bonus MCP).
 
@@ -1059,9 +1059,16 @@ Cette entrée met à jour la situation du projet à la livraison. Les descriptio
 #### Limites et tâches non closes
 - L'évaluation exhaustive de `agent_tools --provider ollama` n'est pas documentée comme terminée ; ne pas la confondre avec le run local `agent`.
 - Aucune comparaison finale documentée contre une baseline DINUM.
-- Audit explicite des secrets encore à formaliser.
+- Contrôle Gitleaks effectué sur 128 commits (370,97 Mo) : 20 alertes non qualifiées dans d'anciens fichiers XML Service-Public ; la nature exacte des valeurs n'a pas été vérifiée.
 - Variante hiérarchique de découpage non évaluée séparément.
 - Des erreurs documentaires `q021`/`q022` restent connues ; les 52 questions valides ne sont pas 52 réponses toutes correctes.
 - Connexion à Claude Desktop non testée.
 
+### 20 octobre 2026 — Contrôle de sécurité Git (Gitleaks)
 
+- Vérification de la liste des fichiers suivis : seul `.env.example` est apparu parmi les noms recherchés ; `.env` est ignoré selon `git check-ignore -v .env` (`.gitignore`, ligne 227).
+- Gitleaks **8.30.1** exécuté en lecture seule sur l'historique accessible localement, avec `--log-opts="--all"` et masquage des valeurs (`--redact=100`).
+- **128 commits** analysés, **370,97 Mo** parcourus, **20 alertes** de type `generic-api-key`.
+- Les alertes se concentrent dans cinq fichiers historiques `service_public_xml/` : `F1400.xml` (6), `F1551.xml` (2), `F2042.xml` (6), `F31301.xml` (4) et `R69011.xml` (2), sur **10 positions distinctes**.
+- Ces cinq fichiers ne sont plus suivis par Git dans la version actuelle de `main`. Les alertes restent présentes dans l'historique accessible ; leur nature exacte (faux positifs, identifiants publics ou secrets réels) n'a **pas** été confirmée.
+- **Statut : tâche de lancement et de documentation du contrôle cochée** ; aucun secret confirmé à ce stade, mais **absence de secrets non garantie**. Aucune rotation de clé ni réécriture de l'historique réalisée. Le rapport local n'a pas été publié dans GitHub.
