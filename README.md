@@ -438,8 +438,9 @@ git clone https://github.com/Charles-Scannavino/Projet_Generative_AI.git
 cd Projet_Generative_AI
 ~~~
 
-La version complète intégrant le MCP et les dernières corrections
-sera disponible sur main après validation et fusion des branches.
+Le serveur MCP documentaire initial et les corrections de l'agent
+ont été intégrés dans main via la PR #4. L'extension aux quatre
+outils est documentée dans la section consacrée au bonus MCP.
 
 ### Étape 2 — Installer Python et les dépendances
 
@@ -594,17 +595,77 @@ de comparer plusieurs stratégies de réponse.
 
 ### Étape 9 — Utiliser le bonus MCP
 
-Le serveur MCP peut être démarré avec :
+Le bonus MCP (Model Context Protocol) expose les outils Python
+de l'assistant HLM à des clients externes compatibles.
+
+Les quatre outils disponibles sont :
+
+| Outil | Fonction |
+| --- | --- |
+| `search_docs` | Recherche hybride BM25 + E5 + RRF + MiniLM |
+| `check_eligibility` | Calcul des plafonds HLM PLAI/PLUS/PLS |
+| `social_housing_stats` | Statistiques communales RPLS |
+| `market_prices` | Prix de vente immobiliers DVF |
+
+Le serveur réutilise les fonctions du projet. Il ne contient
+pas de second moteur RAG ni de nouveau calcul réglementaire.
+
+**Prérequis :** Python 3.12, uv, dépendances synchronisées et
+fichiers de données préparées présents dans le projet.
+
+Pour vérifier les tests MCP :
+
+~~~bash
+uv run pytest -q tests/test_mcp_server.py
+~~~
+
+Pour démarrer le serveur MCP seul :
 
 ~~~bash
 uv run python -m src.mcp_server
 ~~~
 
-Il utilise le transport stdio et attend un client MCP.
-Il ne présente donc pas directement une interface dans le Terminal.
+Le transport est `stdio` : ce processus attend un client MCP
+et n'affiche pas d'interface conversationnelle.
 
-Consulter Docs/MCP.md pour la documentation complète,
-les tests et la démonstration avec MCP Inspector.
+Pour utiliser le client graphique MCP Inspector,
+installer Node.js et lancer depuis la racine du dépôt :
+
+~~~bash
+npx --yes @modelcontextprotocol/inspector uv run python -m src.mcp_server
+~~~
+
+Ouvrir l'adresse locale affichée dans le Terminal.
+Dans Inspector :
+
+1. Connecter le serveur `uv` dans l'onglet Servers.
+2. Ouvrir l'onglet Tools.
+3. Sélectionner l'un des quatre outils.
+4. Renseigner les paramètres et cliquer sur Execute Tool.
+5. Consulter le résultat structuré et les sources.
+
+Exemples de démonstration :
+
+- `search_docs` : question « Qu'est-ce que le DALO ? », `k=5`.
+- `check_eligibility` : Lyon, trois personnes dont une à charge,
+  RFR 28 000 EUR, année 2026.
+- `social_housing_stats` : commune Créteil.
+- `market_prices` : Villeurbanne, Appartement, année 2025.
+
+Les quatre outils ont été validés dans MCP Inspector v2.11.0.
+
+**Important :** MCP Inspector exécute les outils mais ne génère
+pas de réponse conversationnelle. Une application IA compatible
+(par exemple Claude Desktop) peut devenir le client MCP et
+exploiter ces outils pour produire ses propres réponses.
+Cette intégration à un assistant IA externe reste à tester.
+
+Ollama n'est pas requis pour utiliser directement le serveur MCP,
+mais il est nécessaire pour les démonstrations Streamlit locales
+utilisant Qwen3.
+
+Voir `Docs/MCP.md` pour les schémas, la provenance,
+les erreurs, les limites et les évolutions envisagées.
 
 ### Étape 10 — Reproductibilité et limites
 

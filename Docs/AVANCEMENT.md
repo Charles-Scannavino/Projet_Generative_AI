@@ -993,3 +993,65 @@ de la démonstration sur un autre ordinateur.
 - Vérifier la version commune après éventuelle fusion.
 - Préparer les scénarios et la présentation de soutenance.
 - Ne pas fusionner sans validation collective.
+
+### 20 octobre 2026 — Finalisation du bonus MCP complet
+
+#### Fonctionnalités
+
+- Serveur MCP `assistant-hlm`, SDK Python MCP 2.x,
+  transport stdio.
+- Quatre outils exposés et découverts :
+  `search_docs`, `check_eligibility`,
+  `social_housing_stats`, `market_prices`.
+- Réutilisation directe du moteur RAG et des fonctions métier.
+- Entrées validées par Pydantic ; résultats structurés.
+- Conservation des sources officielles, des années de données
+  et des avertissements métier.
+- Aucun calcul réglementaire effectué par un LLM.
+
+#### Tests automatisés
+
+- Neuf tests MCP réussis.
+- Tests d'exécution des trois nouveaux outils avec données réelles.
+- Cinq scénarios d'erreur métier testés.
+- Suite complète : 195 tests réussis, un désélectionné.
+- Golden set : 52 questions valides (20 dev, 32 test).
+- `git diff --check` : aucune anomalie.
+
+#### Démonstration MCP Inspector v2.11.0
+
+- Connexion STDIO : réussie.
+- Version de protocole affichée : MCP 2025-11-25.
+- Découverte des quatre outils : réussie.
+- search_docs : DALO, document F18005 au premier rang,
+  méthode hybrid_rrf+rerank ; appel environ 9,39 s.
+- check_eligibility : Lyon, foyer de trois personnes,
+  RFR 28 000 EUR ; PLUS et PLS éligibles, PLAI non ;
+  appel environ 41 ms.
+- social_housing_stats : Créteil, 15 133 logements
+  au 1er janvier 2025 ; appel environ 41 ms.
+- market_prices : Villeurbanne, Appartement, 2025,
+  1 890 ventes, médiane 3 567 EUR/m2 ;
+  appel environ 1,86 s.
+
+Ces latences sont des observations ponctuelles, pas des
+moyennes ni des benchmarks comparatifs.
+
+#### Documentation et limites
+
+- README : procédure d'installation et d'utilisation du MCP.
+- Docs/MCP.md : contrats des outils, exemples et dépannage.
+- Connexion à Claude Desktop proposée comme prolongement ;
+  aucune validation avec un agent IA externe à ce stade.
+- MCP Inspector ne produit pas de réponse par un LLM.
+- RPLS ne renseigne pas la disponibilité en temps réel.
+- DVF ne renseigne pas les loyers.
+- Les limites du retrieval juridique q021/q022 subsistent.
+
+#### Livraison
+
+- Version initiale fusionnée dans main via la PR #4,
+  commit 8c0e567.
+- Extension développée sur charles-bonus-mcp-complet.
+- Reste à publier l'extension et à vérifier la version
+  intégrée avant le tag Git final v1.0.

@@ -125,3 +125,152 @@ def test_mcp_rejects_invalid_k():
             "entre 1 et 30",
         )
     )
+
+
+def test_mcp_four_tools_discovery():
+    """Les quatre outils doivent être accessibles au client MCP."""
+
+    async def run():
+        async with Client(mcp_server.mcp) as client:
+            response = await client.list_tools()
+            names = {tool.name for tool in response.tools}
+            assert names == {
+                "search_docs",
+                "check_eligibility",
+                "social_housing_stats",
+                "market_prices",
+            }
+
+    asyncio.run(run())
+
+
+def test_mcp_eligibility_real_data():
+    """Le MCP doit retourner le calcul déterministe du barème 2026."""
+
+    async def run():
+        async with Client(mcp_server.mcp) as client:
+            result = await client.call_tool(
+                "check_eligibility",
+                {
+                    "revenu_fiscal_reference": 28000.0,
+                    "nb_personnes": 3,
+                    "nb_personnes_a_charge": 1,
+                    "commune": "Lyon",
+                    "annee": 2026,
+                },
+            )
+            assert not result.is_error
+            data = result.structured_content
+            assert data["plafonds"] == {
+                "plai": 22551,
+                "plus": 37584,
+                "pls": 48859,
+            }
+            assert data["eligible"] == {
+                "plai": False,
+                "plus": True,
+                "pls": True,
+            }
+            assert data["provenance"]["data_year"] == 2026
+
+    asyncio.run(run())
+
+
+def test_mcp_rpls_real_data():
+    """Le MCP conserve les statistiques et la provenance RPLS."""
+
+    async def run():
+        async with Client(mcp_server.mcp) as client:
+            result = await client.call_tool(
+                "social_housing_stats",
+                {"commune": "Créteil"},
+            )
+            assert not result.is_error
+            data = result.structured_content
+            assert data["nb_logements"] == 15133
+            assert data["millesime"] == 2025
+            assert data["provenance"]["data_year"] == 2025
+            assert data["caveats"]
+
+    asyncio.run(run())
+
+
+def test_mcp_dvf_real_data():
+    """Le MCP conserve les statistiques DVF et leurs restrictions."""
+
+    async def run():
+        async with Client(mcp_server.mcp) as client:
+            result = await client.call_tool(
+                "market_prices",
+                {
+                    "commune": "Villeurbanne",
+                    "type_local": "Appartement",
+                    "annee": 2025,
+                },
+            )
+            assert not result.is_error
+            data = result.structured_content
+            stats = data["statistiques"]
+            assert len(stats) == 1
+            assert stats[0]["n_ventes"] == 1890
+            assert stats[0]["prix_m2_median"] == 3567.0
+            assert data["provenance"]["data_year"] == 2025
+            assert data["caveats"]
+
+    asyncio.run(run())
+
+
+def test_mcp_invalid_business_inputs():
+    """Les entrées invalides doivent produire des erreurs MCP."""
+
+    cases = [
+        (
+            "check_eligibility",
+            {
+                "revenu_fiscal_reference": 28000.0,
+                "nb_personnes": 2,
+                "nb_personnes_a_charge": 2,
+                "commune": "Lyon",
+            },
+        ),
+        (
+            "check_eligibility",
+            {
+                "revenu_fiscal_reference": 28000.0,
+                "nb_personnes": 3,
+                "commune": "Lyon",
+                "annee": 2030,
+            },
+        ),
+        (
+            "social_housing_stats",
+            {"commune": "CommuneInexistanteXYZ"},
+        ),
+        (
+            "market_prices",
+            {
+                "commune": "Villeurbanne",
+                "type_local": "Appartement",
+                "annee": 2030,
+            },
+        ),
+        (
+            "market_prices",
+            {
+                "commune": "Villeurbanne",
+                "type_local": "Chateau",
+                "annee": 2025,
+            },
+        ),
+    ]
+
+    async def run():
+        async with Client(mcp_server.mcp) as client:
+            for name, arguments in cases:
+                result = await client.call_tool(name, arguments)
+                assert result.is_error, (
+                    f"{name} a accepté des arguments invalides : "
+                    f"{arguments}"
+                )
+
+    asyncio.run(run())
