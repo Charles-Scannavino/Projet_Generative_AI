@@ -4,34 +4,19 @@
 
 ## 1. État global
 
-**Statut actuel :** ✅ Corpus RAG finalisé (**455 documents**), chunking de référence **`fixed_300_60`** figé (**1 357 chunks**). ✅ **Retrieval final livré** : `search_docs` = BM25 + dense E5 + fusion **RRF** + reranker **`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`**, évalué sur les **18 questions RAG** (Recall@5 = 1,0000, Recall@10 = 1,0000, MRR = 0,9444, latence p95 = 503 ms/requête sur le MacBook Pro M1) et couvert par **22 tests**. ✅ **Prototype RAG end-to-end validé** avec Ollama / **`qwen3:4b`** : réponse citée, correction du cas DALO et abstention sur une demande de disponibilité temps réel. **Prochaine étape principale : extraire le RAG hors du notebook, réduire/mesurer la latence et créer `eval/run_eval.py`.**
+**État de référence au 21 octobre 2026 — projet livré et validé sans notebook :** le corpus final contient **455 documents** (117 Service-Public et 338 LEGI) et **1 357 chunks** selon `fixed_300_60`. Le retrieval `search_docs` associe BM25, embeddings E5, fusion RRF et reranking MiniLM. Les backends RAG et agent utilisent `qwen3:4b-instruct` via Ollama, des sorties structurées Pydantic, des citations contrôlées et une stratégie d'abstention. Les calculs d'éligibilité, les statistiques RPLS et les prix DVF sont produits par des outils Python déterministes.
 
-**Étape en cours :**
-- le prototype RAG du notebook est validé localement : `search_docs` → Ollama/`qwen3:4b` → sortie Pydantic → citations contrôlées / abstention ;
-- le corpus brut Service-Public a été parsé dans Colab ;
-- 3 004 fiches `F*.xml` ont été indexées dans un DataFrame de métadonnées ;
-- 350 fiches rattachées au sujet `Logement` ont été retenues comme **corpus Service-Public de travail** ;
-- 505 fiches apparaissent dans le filtre logement élargi, mais ce filtre contient des faux positifs et n'est pas retenu tel quel ;
-- 24 fiches correspondent au filtre HLM strict ;
-- un parser local `src/ingestion/service_public.py` a été créé et testé sur 5 fiches de référence ;
-- les 350 fiches contenant `Logement` dans `dc:subject` ont été extraites dans `data/processed/service_public_documents.jsonl` ;
-- la déduplication ciblée des conteneurs (`ASavoir`, `Attention`, `ANoter`, `Exemple`, `Definition`) a été validée sur les 5 fiches de référence sans perte du texte métier de `F21051` ;
-- les 350 fiches ont été régénérées : 0 document vide, minimum 48 caractères / 8 mots, maximum 45 331 caractères / 7 498 mots, moyenne 9 872,5 caractères / 1 555,6 mots ;
-- l'audit des 10 documents les plus courts et longs a été réalisé ;
-- un échantillon reproductible de 20 documents (seed 42) a été lu et montre que le thème `Logement` est trop large pour l'assistant HLM : il contient aussi urbanisme, copropriété, piscines, taxe d'aménagement, forage, etc. ;
-- audit hiérarchique réalisé sur les 350 fiches : 107 `Bail d’habitation`, 63 `Urbanisme`, 47 `Copropriété`, 40 `Aides financières pour le logement`, 31 `Vie pratique dans un logement`, 28 `Achat immobilier`, 26 `Protection et sécurité de l'habitat`, 8 `Expropriation - Préemption` ;
-- dossiers particulièrement pertinents identifiés : `Accéder à un logement social` (8), `Aides personnelles au logement` (8), ainsi que plusieurs dossiers de bail d'habitation ;
-- classification automatique du périmètre exécutée : **125 KEEP**, **33 REVIEW**, **192 EXCLUDE** ;
-- revue manuelle terminée : les **33 `REVIEW`** ont été exclus du cœur HLM ; parmi les **13 `social_keyword`**, **5** ont été conservés et **8** exclus ;
-- corpus Service-Public HLM final généré : **117 KEEP**, **233 EXCLUDE**, **0 REVIEW** ;
-- contrôles finaux validés : **0 document vide**, **0 doublon**, **15/15 `gold_docs` présents**, aucun `gold_doc` manquant ;
-- fichiers générés : `data/processed/service_public_hlm_documents.jsonl` et `data/processed/service_public_scope_decisions_final.csv` ;
-- retrieval final livré le 13 octobre 2026 (hybride RRF + reranker, `search_docs`, ablation des 5 méthodes, 22 tests) ;
-- étape actuelle : intégrer Ollama / `qwen3:4b` au pipeline RAG, puis créer `eval/run_eval.py`.
+**Interfaces et bonus :** l'application `app/streamlit_app.py` affiche les réponses, les sources et les traces d'outils. Le serveur `src/mcp_server.py` expose **quatre outils MCP** (recherche, éligibilité, RPLS, DVF), validés dans MCP Inspector v2.11.0. La connexion à Claude Desktop reste une perspective non testée.
 
-**Échéances :**
-- gel du code : **20 octobre 2026 à 23 h 59** ;
-- soutenance : **21 octobre 2026**.
+**Validation (21 octobre, branche sans notebook validée) :** **215 tests réussis, 2 désélectionnés** ; les 9 tests MCP réussissent également. La version antérieure livrée le 20 octobre comptait 195 tests réussis et un désélectionné. ; `eval/check_golden.py` valide la **structure de 52 questions** (20 `dev`, 32 `test`). Cette validation ne garantit pas la justesse de toutes les réponses. Les limites juridiques observées pour `q021` et `q022` restent documentées. Le run local `agent` de 52 questions ne vaut pas évaluation exhaustive de `agent_tools --provider ollama`.
+
+**Livraison :** PR #4 et #5 fusionnées ; bonus MCP intégré au commit `32ec0a3`. Le RAG amélioré par Alexis et les tests Anthropic sont intégrés au code de la version sans notebook ; les tests API Anthropic réels restent à effectuer. Un commit d'évaluation supplémentaire (`24702f`) est la **cible actuelle du tag `v1.0`** publié le 20 octobre 2026.
+
+**Soutenance :** une **vidéo de secours de Streamlit a été enregistrée** ; une **démonstration Streamlit en direct est prévue le 21 octobre 2026**. La vidéo servira de repli en cas de problème technique ou de latence.
+
+**Travaux ouverts ou facultatifs :** évaluation exhaustive de `agent_tools` en local, comparaison DINUM, analyse d'une variante de chunking structurelle et connexion éventuelle à un client MCP conversationnel externe. Un contrôle automatisé de sécurité Git a été réalisé.
+
+**Échéances :** gel du code le 20 octobre 2026 à 23 h 59 (tag `v1.0` créé) ; soutenance le 21 octobre 2026.
 
 ## 2. Tableau de progression
 
@@ -56,7 +41,7 @@
 - [x] Vérifier la présence de **Homebrew (`brew`)** sur la machine locale.
 - [x] Mettre en place Ollama / modèle local (`qwen3:4b`, 2,5 Go, MacBook Pro M1 16 Go).
 - [x] Exécuter un premier test interactif avec `ollama run qwen3:4b`.
-- [ ] Tester l'API locale Ollama depuis Python dans le projet.
+- [x] Tester l'API locale Ollama depuis Python dans le projet (appels réels via les backends RAG et agent).
 
 ### Service-Public — corpus brut
 
@@ -93,10 +78,8 @@
 
 - [x] Lire manuellement un échantillon d'au moins 20 documents.
 - [x] Définir plusieurs stratégies de chunking.
-- [ ] Tester au moins :
-  - découpage par sections ;
-  - taille fixe raisonnable avec overlap ;
-  - variante adaptée à la structure Service-Public / LEGI.
+- [x] Comparer les trois stratégies de chunking `fixed_300_60`, `paragraph_400_80` et `fixed_500_100` (résultats dans `eval/bm25_chunking/`).
+- [ ] Évaluer séparément une variante hiérarchique propre à la structure Service-Public / LEGI (non réalisée dans `v1.0`).
 - [x] Conserver les métadonnées dans chaque chunk (`chunk_id`, `document_id`, source, titre, article, URL, position, texte et `retrieval_text`).
 - [x] Comparer les stratégies sur le golden set avec BM25.
 - [x] Figer le chunking final : `fixed_300_60` (300 mots, overlap 60).
@@ -110,8 +93,8 @@
 - [x] Les questions RAG sont ancrées sur des identifiants Service-Public réels.
 - [x] Les cas d'éligibilité, RPLS et DVF non encore vérifiables sont conservés dans `eval/golden_backlog_pending.jsonl`.
 - [x] Golden set v2 (Gaby) retenu le 17 octobre : **52 questions**, splits `dev` / `test`, champs `expected_tool`, `should_abstain`, `expected` (la v1 enrichie d'Alexis, 33 questions, est abandonnée).
-- [ ] Étendre progressivement vers environ 40 questions (notamment des questions ciblant des articles LEGI).
-- [ ] Couvrir :
+- [x] Porter le golden set à **52 questions** (20 `dev`, 32 `test`) et vérifier sa structure avec `eval/check_golden.py`.
+- [x] Couvrir :
   - factuel RAG ;
   - éligibilité ;
   - RPLS ;
@@ -121,7 +104,7 @@
   - pièges causaux ;
   - abstention.
 - [x] Vérifier les `gold_docs` avec les identifiants réels du corpus (**15/15 présents**).
-- [ ] Ne pas remplir artificiellement les réponses ou sources avant validation des données.
+- **Règle permanente :** ne pas inventer de réponses ou de sources manquantes avant validation des données.
 
 ### Retrieval
 
@@ -145,11 +128,11 @@
 
 - [x] Construire `search_docs` (`src/retrieval/search.py`, contrat Pydantic dans `src/retrieval/schemas.py`, 22 tests dans `tests/test_retrieval.py`).
 - [x] Installer et valider le modèle génératif local via Ollama : **`qwen3:4b`**.
-- [ ] Intégrer Ollama / `qwen3:4b` au pipeline Python du RAG.
-- [ ] Produire des réponses fondées uniquement sur les sources récupérées.
-- [ ] Ajouter les citations.
-- [ ] Mettre en place une stratégie d'abstention.
-- [ ] Valider les sorties avec Pydantic.
+- [x] Intégrer Ollama au RAG modulaire (`src/agent/rag.py`, modèle de démonstration `qwen3:4b-instruct`).
+- [x] Générer des réponses à partir des passages retrouvés et limiter les affirmations non étayées (des erreurs de qualité résiduelles sont documentées).
+- [x] Ajouter et contrôler les citations documentaires.
+- [x] Mettre en place une stratégie d'abstention lorsque les données disponibles sont insuffisantes.
+- [x] Valider les sorties structurées avec Pydantic.
 
 ### Outils déterministes
 
@@ -177,17 +160,17 @@
 - [x] Mesurer l'exactitude du routage (`routing_ok` dans `eval/run_eval.py`, backend `agent_tools`).
 - [x] Garde-fous contre la prompt injection (parsing strict, registre fermé, quotas, sorties assainies, citations validées, ancrage des chiffres) : `tests/test_agent.py`, `tests/test_tool_security.py`.
 - [x] Valider `agent_tools` avec Ollama / `qwen3:4b-instruct` (18 octobre, MacBook Air M2 8 Go) : API native `/api/chat`, contexte 8 192, repli par sortie structurée.
-- [ ] Run d'évaluation complet en local (`--provider ollama`) pour la comparaison local vs API.
+- [ ] Réaliser une évaluation exhaustive de **`agent_tools --provider ollama`** comparable aux runs API (un run `agent` local sur 52 questions existe, mais ne répond pas à ce besoin précis).
 
 ### Évaluation complète
 
-- [ ] Créer `eval/run_eval.py`.
-- [ ] Respecter la commande demandée :
+- [x] Créer `eval/run_eval.py` et documenter son utilisation.
+- [x] Prendre en charge la commande demandée :
   ```bash
   uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
   ```
-- [ ] Produire `eval/results.jsonl`.
-- [ ] Enregistrer par question :
+- [x] Permettre la génération de `eval/results.jsonl` dans le dossier de sortie (les résultats de référence sont aussi stockés dans `eval/runs/`).
+- [x] Enregistrer par question :
   - answer ;
   - cited sources ;
   - retrieved document IDs ;
@@ -196,9 +179,9 @@
   - tool calls ;
   - stop reason ;
   - coût.
-- [ ] Évaluer la justesse finale.
-- [ ] Analyser au moins 5 erreurs en détail.
-- [ ] Comparer qualité / coût / latence.
+- [x] Évaluer la justesse sur les runs API avec un juge LLM (sans étendre leurs scores aux autres configurations).
+- [x] Étudier au moins cinq catégories de cas problématiques (retrieval, génération, abstention, exactitude numérique et causalité).
+- [x] Comparer qualité, coût et latence sur les configurations réellement évaluées.
 
 ### Interface et livraison
 
@@ -207,15 +190,15 @@
 En complément du périmètre principal, deux pistes peuvent apporter une valeur supplémentaire au projet : **exposer la solution via un serveur MCP**, afin de pouvoir brancher notre assistant et ses outils à différents LLM compatibles, et **préparer une mise en production simple**, de façon à ce qu'un utilisateur puisse lancer et utiliser la solution finale depuis son propre ordinateur sans dépendre de notre environnement de développement. Ces éléments sont considérés comme des bonus et ne doivent pas retarder les fonctionnalités principales du RAG, de l'agent et de l'évaluation.
 
 
-- [ ] Créer une interface simple Streamlit si le temps le permet.
-- [ ] Afficher réponse, sources et trace de l'agent.
+- [x] Créer l'interface Streamlit (`app/streamlit_app.py`) et la valider sur des scénarios réels.
+- [x] Afficher réponse, sources et trace des appels de l'agent dans Streamlit.
 - [x] README initial du dépôt rédigé et mis à jour avec l'architecture, l'état du projet et le workflow.
-- [ ] Documenter les versions exactes des modèles lorsque les choix seront figés.
-- [ ] Ajouter `.env.example`.
+- [x] Documenter les noms et les principales configurations des modèles retenus dans `README.md`.
+- [x] Ajouter `.env.example` (fichier présent dans le dépôt).
 - [x] `.gitignore` adapté au projet (Python/Colab, données extraites, index, résultats d'évaluation, secrets).
-- [ ] Vérifier qu'aucune clé API n'est présente.
-- [ ] Préparer la démonstration de secours enregistrée.
-- [ ] Créer le tag `v1.0` au gel du code.
+- [x] Effectuer un contrôle automatisé de sécurité des fichiers suivis et de l'historique Git : `.env` ignoré, vérification des fichiers sensibles versionnés et scan Gitleaks exécuté sur 128 commits. Ce contrôle ne garantit pas l'absence absolue de secrets.
+- [x] Préparer et enregistrer une vidéo de secours Streamlit ; démonstration en direct prévue à l'oral du 21 octobre (confirmé par le présentateur).
+- [x] Créer et publier le tag `v1.0` (cible vérifiée : commit `24702f` ; le commit `32ec0a3` correspond à l'intégration du bonus MCP).
 
 ## 3. Résultats observés à ce jour
 
@@ -1053,8 +1036,41 @@ moyennes ni des benchmarks comparatifs.
 - Version initiale fusionnée dans main via la PR #4,
   commit 8c0e567.
 - Extension développée sur charles-bonus-mcp-complet.
-- Reste à publier l'extension et à vérifier la version
-  intégrée avant le tag Git final v1.0.
+- Statut final : extension MCP fusionnée via la PR #5 (commit `32ec0a3`) ; le tag `v1.0` pointe vers le commit ultérieur `24702f` d'ablation retrieval sur le split test.
+
+### 20 octobre 2026 — Bilan final et soutenance
+
+Cette entrée met à jour la situation du projet à la livraison. Les descriptions d'anciennes étapes encore visibles plus haut constituent un **historique daté**, et non une liste actualisée des travaux à venir.
+
+#### Livrable validé
+- Corpus : **455 documents**, **1 357 passages**, chunking `fixed_300_60`.
+- Retrieval hybride BM25/E5/RRF/MiniLM, RAG, agent et trois outils métier fonctionnels.
+- Interface Streamlit fonctionnelle, avec sources et trace d'exécution.
+- Serveur MCP proposant quatre outils, vérifiés dans MCP Inspector v2.11.0 ; **9 tests MCP réussis**.
+- Validation finale sur `main` : **195 tests réussis**, un désélectionné ; **52 questions structurellement valides** (20 développement, 32 test).
+- PR #4 et #5 fusionnées ; bonus MCP au commit `32ec0a3` ; tag **`v1.0`** actuellement associé au commit `24702f`. Les corrections documentaires sur `main` n'affectent pas ce tag.
+
+#### Démonstration de soutenance
+- **Un enregistrement vidéo Streamlit de secours a été réalisé** par le présentateur ; son emplacement de stockage n'est pas documenté dans le dépôt.
+- **Une démonstration Streamlit en direct est prévue le 21 octobre 2026**, avec repli sur la vidéo en cas d'imprévu.
+- Scénarios préparés : DALO (fiche `F18005`), éligibilité à Lyon, RPLS à Créteil et DVF à Villeurbanne.
+- MCP Inspector permet de montrer les quatre outils MCP sans avoir besoin du LLM local.
+
+#### Limites et tâches non closes
+- L'évaluation exhaustive de `agent_tools --provider ollama` n'est pas documentée comme terminée ; ne pas la confondre avec le run local `agent`.
+- Aucune comparaison finale documentée contre une baseline DINUM.
+- Contrôle automatisé Gitleaks effectué sur 128 commits (370,97 Mo) ; aucune conclusion exhaustive sur l'absence de secrets.
+- Variante hiérarchique de découpage non évaluée séparément.
+- Des erreurs documentaires `q021`/`q022` restent connues ; les 52 questions valides ne sont pas 52 réponses toutes correctes.
+- Connexion à Claude Desktop non testée.
+
+### 20 octobre 2026 — Contrôle de sécurité Git (Gitleaks)
+
+- Vérification de la liste des fichiers suivis : seul `.env.example` est apparu parmi les noms recherchés ; `.env` est ignoré selon `git check-ignore -v .env` (`.gitignore`, ligne 227).
+- Gitleaks **8.30.1** exécuté en lecture seule sur l'historique accessible localement, avec `--log-opts="--all"` et masquage des valeurs (`--redact=100`).
+- **128 commits** analysés, **370,97 Mo** parcourus.
+- Le contrôle automatisé a été exécuté et documenté. Il ne constitue pas une certification d'absence de secrets ; une vérification manuelle resterait nécessaire pour lever toute incertitude.
+- Aucune modification de l'historique Git ni du tag `v1.0` n'a été réalisée. Le rapport local n'a pas été publié sur GitHub.
 
 ### 20 octobre 2026 — RAG de Charles intégré et fournisseur Anthropic (Alexis)
 
@@ -1100,3 +1116,16 @@ moyennes ni des benchmarks comparatifs.
 - Renseigner `ANTHROPIC_API_KEY`, lancer le test d'intégration puis un run
   `agent_tools --provider anthropic` pour compléter la comparaison local vs API.
 - Fermer la PR #2, désormais intégrée.
+
+### 21 octobre 2026 — Validation d'intégration sans notebook
+
+- Branche d'essai `test-alexis-sans-notebook` : retrait de `notebooks/Assistant_HLM_RAG.ipynb` validé par Alexis.
+- Suite Python `uv run pytest -q` : **215 tests réussis, 2 désélectionnés** après retrait du notebook.
+- Suite MCP `uv run pytest -q tests/test_mcp_server.py` : **9 tests réussis**.
+- Retrieval hybride vérifié par la question DALO : document **F18005** retrouvé au premier rang.
+- RAG local `--backend rag --provider ollama` : réponse sur le DALO avec citation Service-Public F18005.
+- Streamlit testé en réel avec le RAG, puis avec `agent_tools --provider ollama` : appels fonctionnels à `check_eligibility` et `social_housing_stats`.
+- Les corrections RAG d'Alexis et la suppression du notebook ne nécessitent aucun fichier `.ipynb` pour les chemins d'exécution testés.
+- Anthropic : tests avec SDK simulé couverts par la suite automatique ; appels réels non validés faute de `ANTHROPIC_API_KEY` dans le `.env` local.
+- Le tag historique `v1.0` reste inchangé. Les contrôles automatisés et démonstrations réalisés ne prouvent pas l'exécution exhaustive de tous les scénarios en production.
+
