@@ -75,22 +75,24 @@ with st.sidebar:
     st.header("Réglages")
     backend = st.radio(
         "Backend", BACKENDS, index=BACKENDS.index("agent"),
-        help="baseline : BM25 sans LLM · rag : recherche + Qwen3 · agent : Qwen3 choisit les outils · "
-             "agent_tools : tool calling natif (API OpenRouter ou Ollama)",
+        help="baseline : BM25 sans LLM · rag : recherche + LLM · agent : Qwen3 choisit les outils · "
+             "agent_tools : tool calling natif (OpenRouter, Anthropic ou Ollama)",
         format_func={"baseline": "baseline (sans LLM)", "rag": "rag", "agent": "agent (outils)",
                      "agent_tools": "agent_tools (tool calling)"}.get,
     )
     provider = None
-    if backend == "agent_tools":
-        provider = st.radio("Fournisseur", ["openrouter", "ollama"], horizontal=True,
-                            help="openrouter : modèle API de configs/agent.yaml (clé dans .env)")
+    if backend in ("rag", "agent_tools"):
+        providers = ["ollama", "openrouter", "anthropic"]
+        provider = st.radio("Fournisseur", providers, horizontal=True,
+                            index=providers.index("ollama" if backend == "rag" else "openrouter"),
+                            help="openrouter / anthropic : modèle API de configs/agent.yaml (clé dans .env)")
     retriever = st.selectbox(
         "Recherche", ["hybrid", "hybrid_norerank", "bm25"],
         format_func={"hybrid": "Hybride + reranker", "hybrid_norerank": "Hybride (RRF)", "bm25": "BM25 seul"}.get,
     )
     k = st.slider("Passages (k)", 1, 10, 5)
     models = ollama_models()
-    if backend != "baseline" and provider != "openrouter":
+    if backend != "baseline" and provider in (None, "ollama"):
         if models is None:
             st.error("Ollama injoignable. Lancer `ollama serve`.")
             model = ollama.DEFAULT_MODEL

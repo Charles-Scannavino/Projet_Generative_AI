@@ -86,6 +86,7 @@ class DocumentMeta:
     title: str
     url: str
     source: str
+    article: str | None = None
 
 
 def make_search_docs(
@@ -392,7 +393,9 @@ class ToolExecutor:
             for hit in response.results:
                 self.documents.setdefault(
                     hit.document_id,
-                    DocumentMeta(hit.document_id, hit.title, hit.url, hit.source),
+                    DocumentMeta(
+                        hit.document_id, hit.title, hit.url, hit.source, hit.article
+                    ),
                 )
             if any(detect_injection(passage.text) for passage in result.passages):
                 self.injection_in_sources = True

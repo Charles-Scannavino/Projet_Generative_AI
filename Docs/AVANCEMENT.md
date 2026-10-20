@@ -1055,3 +1055,48 @@ moyennes ni des benchmarks comparatifs.
 - Extension développée sur charles-bonus-mcp-complet.
 - Reste à publier l'extension et à vérifier la version
   intégrée avant le tag Git final v1.0.
+
+### 20 octobre 2026 — RAG de Charles intégré et fournisseur Anthropic (Alexis)
+
+#### RAG (`src/agent/rag.py`)
+
+- `answer_with_rag` reprend la logique de la PR #2 (Charles) : prompt système
+  à 7 règles, sortie JSON contrainte `{answer, citation_document_ids, abstained}`,
+  passages transmis au LLM en JSON (document_id, source, titre, article, URL, texte).
+- Adaptation au contrat commun : `AssistantResponse`, façade `ask()` et
+  fonctions partagées (`passages_from`, `unsupported_numbers`, `error_response`)
+  conservées ; aucune exception ne remonte à l'interface ni à `run_eval`.
+- Contrôles stricts de Charles convertis en abstention tracée dans `warnings` :
+  citation hors contexte, réponse non abstenue sans citation ; une abstention
+  ne garde aucune citation. Les citations LEGI portent leur numéro d'article.
+- Fournisseur au choix : Ollama (défaut), OpenRouter ou Anthropic.
+
+#### Fournisseur Anthropic (bonus local vs API)
+
+- `AnthropicClient` (SDK officiel `anthropic` 1.16.0), clé `ANTHROPIC_API_KEY`
+  lue uniquement depuis `.env`, modèle par défaut **Claude Opus 5.5**
+  (`claude-opus-5-5`, effort `medium`, `max_tokens` 16 000, 4 $ / 20 $ par MTok).
+- Disponible pour `rag`, `agent_tools` et le juge de `run_eval`
+  (`--provider anthropic`, `--judge-provider anthropic`), ainsi que dans l'UI.
+- Contraintes d'Opus 5.5 respectées : ni `temperature` ni `seed`,
+  `tool_choice` automatique, blocs de raisonnement renvoyés tels quels,
+  refus (`stop_reason = refusal`) converti en réponse `error`.
+- Repli serveur `fallbacks: "default"` activé (modèle réellement utilisé
+  enregistré dans `model`).
+
+#### Vérifications
+
+- Suite complète : 215 tests réussis (20 nouveaux : `tests/test_rag.py`,
+  `tests/test_anthropic.py` avec SDK simulé), 2 désélectionnés (intégration).
+- `rag` réel via OpenRouter (`openai/gpt-4.1-mini`) : DALO cité F18005,
+  4,6 s, 0,0014 $ ; disponibilité temps réel à Lyon : abstention sans citation.
+- `rag` réel via Ollama (`qwen3:4b-instruct`, MacBook Air M2 8 Go) : DALO
+  cité F18005, 63 s chargement du modèle compris.
+- Anthropic non testé en réel : `ANTHROPIC_API_KEY` absente du `.env`.
+  Test d'intégration prêt : `uv run pytest -m integration tests/test_anthropic.py`.
+
+#### Reste à faire
+
+- Renseigner `ANTHROPIC_API_KEY`, lancer le test d'intégration puis un run
+  `agent_tools --provider anthropic` pour compléter la comparaison local vs API.
+- Fermer la PR #2, désormais intégrée.

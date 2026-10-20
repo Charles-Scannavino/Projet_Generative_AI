@@ -248,11 +248,19 @@ Tous les backends renvoient le même contrat Pydantic `AssistantResponse` (`src/
 | Backend | Principe | Modèle |
 |---|---|---|
 | `baseline` | BM25 seul, sans LLM (`src/agent/baseline.py`) | aucun |
-| `rag` | `search_docs` puis synthèse citée (`src/agent/rag.py`) | Ollama `qwen3:4b-instruct` |
+| `rag` | `search_docs` puis réponse JSON contrainte `{answer, citation_document_ids, abstained}` (`src/agent/rag.py`, module de Charles adapté au contrat commun) : une réponse qui cite un document hors contexte, ou qui ne cite rien sans s'abstenir, est rejetée et remplacée par une abstention | Ollama `qwen3:4b-instruct` (défaut), OpenRouter ou Anthropic (`--provider`) |
 | `agent` | recherche systématique + formulaire JSON rempli par le LLM ; Python choisit et exécute l'outil (`src/agent/agent.py`), conçu pour un petit modèle local | Ollama `qwen3:4b-instruct` |
-| `agent_tools` | **tool calling natif** : le LLM enchaîne `search_docs` et les trois outils, puis répond via un pseudo-outil `final_answer` (`src/agent/tool_agent.py`) | `openai/gpt-4.1-mini` via OpenRouter (`temperature = 0`, `seed = 42`), ou Ollama |
+| `agent_tools` | **tool calling natif** : le LLM enchaîne `search_docs` et les trois outils, puis répond via un pseudo-outil `final_answer` (`src/agent/tool_agent.py`) | `openai/gpt-4.1-mini` via OpenRouter (`temperature = 0`, `seed = 42`, défaut), Anthropic ou Ollama |
 
-Configuration de `agent_tools` : `configs/agent.yaml` et `configs/tools.yaml` (lus par `src/settings.py`), prompts dans `prompts/*.md.j2` (Jinja2). Le secret `OPENROUTER_API_KEY` est lu uniquement depuis `.env` (voir `.env.example`). Toute valeur YAML peut être surchargée par variable d'environnement, ex. `HLM_AGENT__BACKEND=ollama`.
+Configuration de `agent_tools` : `configs/agent.yaml` et `configs/tools.yaml` (lus par `src/settings.py`), prompts dans `prompts/*.md.j2` (Jinja2). Les secrets `OPENROUTER_API_KEY` et `ANTHROPIC_API_KEY` sont lus uniquement depuis `.env` (voir `.env.example`). Toute valeur YAML peut être surchargée par variable d'environnement, ex. `HLM_AGENT__BACKEND=ollama`.
+
+**Bonus : fournisseur Anthropic** (`--provider anthropic`, backends `rag` et `agent_tools`, juge de `run_eval` compris). Modèle par défaut : **Claude Opus 5.5** (`claude-opus-5-5`, 4 $ / 20 $ par million de tokens en entrée / sortie, coût enregistré dans `cost_usd`), via le SDK officiel `anthropic` (`AnthropicClient`, `src/agent/llm.py`). Différences avec OpenRouter, imposées par l'API d'Opus 5.5 : pas de `temperature` ni de `seed` (refusés), raisonnement adaptatif toujours actif, réglé par `effort` (`medium` dans `configs/agent.yaml`) ; `tool_choice` laissé à `auto` ; les blocs de raisonnement sont renvoyés tels quels au tour suivant ; un refus du modèle (`stop_reason = "refusal"`) devient une réponse `error`. Le repli serveur (`fallbacks: "default"`, bêta `server-side-fallback-2026-07-01`) est activé : en cas d'indisponibilité, l'API peut répondre avec un autre modèle Claude, dont le nom est enregistré dans `model` (son coût n'est alors pas calculé : `cost_usd = null`).
+
+```bash
+uv run python -m src.agent "Qu'est-ce que le DALO ?" --backend rag --provider anthropic --json
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/ --backend agent_tools \
+    --provider anthropic --run-name agent_tools_opus55
+```
 
 ```bash
 cp .env.example .env    # puis renseigner OPENROUTER_API_KEY
