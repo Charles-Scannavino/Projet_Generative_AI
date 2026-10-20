@@ -939,3 +939,57 @@ de la démonstration sur un autre ordinateur.
 - Créer un commit local de finalisation.
 - Soumettre les changements à Alexis et Gaby pour revue.
 - Ne fusionner dans `main` qu'après validation collective.
+
+### 20 octobre 2026 — Validation fonctionnelle et revue GitHub
+
+#### Démonstrations Streamlit
+
+- Interface lancée avec `uv run streamlit run app/streamlit_app.py`.
+- Backend `agent`, recherche hybride avec reranker,
+  modèle Ollama `qwen3:4b-instruct`, 5 passages.
+- DALO : réponse générée, document officiel `F18005`
+  retrouvé et cité.
+- Éligibilité : couple avec un enfant à Lyon, RFR de
+  28 000 EUR ; outil `check_eligibility` exécuté.
+  PLAI non éligible, PLUS et PLS éligibles.
+- RPLS : Créteil, millésime 2025, 15 133 logements sociaux ;
+  appel `social_housing_stats` réussi, source SDES citée.
+- DVF : Villeurbanne, appartements vendus en 2025,
+  prix médian de 3 567 EUR/m2 ; appel `market_prices`
+  réussi, source DGFiP citée.
+- Les quatre scénarios ont été validés dans l'interface.
+- Certaines réponses prennent plusieurs dizaines de secondes
+  avec le modèle Ollama exécuté localement.
+
+#### Serveur MCP et dépendances
+
+- `uv run pytest -q tests/test_mcp_server.py` :
+  4 tests réussis en 6,65 secondes.
+- Validation antérieure du protocole MCP depuis un client externe.
+- `uv lock --check` : réussi, 125 packages résolus.
+- `uv sync --locked` : réussi, 100 packages vérifiés.
+- Version Python utilisée : 3.12.7.
+
+#### GitHub et revue collective
+
+- Branche : `charles-finalisation-20261019`.
+- Dernier commit fonctionnel : `5bfd5c4`.
+- Branche publiée et synchronisée avec GitHub.
+- Pull request : `#4`, vers `main`.
+- Adresse : https://github.com/Charles-Scannavino/Projet_Generative_AI/pull/4
+- PR déclarée prête pour revue, sans conflit Git signalé.
+- Demandes de revue envoyées à `Alexis5131` et `GabyD-web`.
+- Aucune approbation reçue au moment de la vérification.
+- Aucun contrôle CI GitHub rapporté sur la branche.
+- Aucune fusion réalisée dans `main`.
+
+#### Limites et travaux restants
+
+- Réponses juridiques `q021` et `q022` encore insuffisantes ;
+  limites du retrieval décrites dans la section précédente.
+- Le succès des tests automatisés ne garantit pas
+  l'exactitude juridique de toutes les réponses.
+- Obtenir les revues d'Alexis et Gaby.
+- Vérifier la version commune après éventuelle fusion.
+- Préparer les scénarios et la présentation de soutenance.
+- Ne pas fusionner sans validation collective.
