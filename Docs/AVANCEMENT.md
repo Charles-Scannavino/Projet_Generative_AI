@@ -843,3 +843,39 @@ de la démonstration sur un autre ordinateur.
 **Conclusion :** intégration MCP techniquement fonctionnelle et tests majeurs réussis sur les scénarios exécutés. Les anomalies de qualité doivent être signalées à l'équipe avant la livraison finale.
 
 **Prochaines étapes :** finaliser `Docs/MCP.md`, transmettre les anomalies à Alexis, préparer une pull request pour revue et ne fusionner dans `main` qu'après validation de l'équipe.
+
+### 20 octobre 2026 — Corrections et validation finale
+
+**Branche :** `charles-finalisation-20261019`.
+
+#### Correction des citations statistiques
+
+- Modification de `src/agent/agent.py` sur une branche séparée.
+- Ajout des citations officielles provenant des outils RPLS et DVF.
+- Suppression des citations juridiques parasites dans les réponses statistiques lorsque la provenance de l outil est disponible.
+- Deux tests de non-régression ajoutés dans `tests/test_agent_provenance.py`.
+- Validation automatisée : 188 tests réussis, un désélectionné.
+- Tests réels avec Ollama et Streamlit : RPLS Créteil et DVF Créteil validés.
+- Les modifications du backend agent devront être relues par Alexis avant fusion.
+
+#### Finalisation du golden set
+
+- `q036` : abstention attendue pour la vacance des logements sociaux à Créteil, absente du fichier RPLS utilisé.
+- `q037` : médiane DVF 2025 des appartements vendus à Villeurbanne : 3 567 EUR/m2, sur 1 890 ventes.
+- `eval/check_golden.py` : 52 questions valides, sans avertissement.
+
+#### Évaluations
+
+- Baseline BM25 : 52 questions exécutées, aucune erreur.
+- Baseline : Hit@5 = 0,69 ; MRR = 0,57.
+- Évaluation Ollama `agent` sur trois questions : 3/3 traitées, sans erreur.
+- Évaluation complète des 52 questions avec Ollama : en cours au moment de cette mise à jour.
+- Les résultats définitifs seront ajoutés après la fin du run.
+
+#### Travaux restants
+
+- Analyser le rapport final des 52 questions avec Ollama.
+- Examiner les échecs et les problèmes de routage ou de citation.
+- Relancer les tests après toute correction supplémentaire.
+- Préparer la revue par Alexis et Gaby.
+- Publier les modifications, intégrer les branches validées et préparer le tag de livraison.

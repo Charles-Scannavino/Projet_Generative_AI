@@ -263,5 +263,40 @@ def run_agent(
         breakdown={"retrieval": search.latency_ms, "routing_llm": routed.latency_ms,
                    "tools": sum(c.latency_ms for c in action_calls), "generation": final.latency_ms},
     )
+    # Ajouter la provenance officielle des outils statistiques.
+    # Ces citations proviennent des données Python, pas du LLM.
+    source_ids = {
+        "social_housing_stats": "RPLS",
+        "market_prices": "DVF",
+    }
+
+    for call in action_calls:
+        if not call.ok or call.name not in source_ids:
+            continue
+
+        if not isinstance(call.output, dict):
+            continue
+
+        provenance = call.output.get("provenance") or {}
+        source_name = provenance.get("source_name")
+        source_url = provenance.get("source_url")
+
+        if not source_name or not source_url:
+            continue
+
+        source_id = source_ids[call.name]
+        citation = Citation(
+            document_id=source_id,
+            source=source_id,
+            title=source_name,
+            url=source_url,
+        )
+
+        # Pour un résultat statistique, la provenance de
+        # l outil est la référence directe des chiffres.
+        # Ne pas afficher les documents juridiques récupérés
+        # comme justification de ces statistiques.
+        response.citations = [citation]
+
     response.warnings = warnings + response.warnings
     return response
