@@ -723,3 +723,273 @@ Ne jamais remplacer un résultat réel par une hypothèse. Une tâche reste `[ ]
 - Contrôles initiaux : JSON du notebook valide et espaces Git propres. Le runtime Ollama n'avait pas encore été lancé dans cette session ; cette validation a été réalisée le 15 octobre.
 
 *Dernière mise à jour : 15 octobre 2026 — golden set v2 (52 questions), run_eval, agent et interface.*
+
+### 18 octobre 2026 — serveur MCP et tests validés
+
+**Responsable : Charles — bonus MCP.**
+
+- Branche de travail : `charles-bonus-mcp`, créée depuis `main`.
+- SDK MCP Python 2.3.0 installé avec `uv`.
+- Serveur créé : `src/mcp_server.py`.
+- Premier outil exposé : `search_docs`.
+- Réutilisation directe du retrieval existant : BM25 + E5 + RRF + MiniLM.
+- Réponse MCP structurée en JSON avec identifiants, sources, passages et latence.
+- Découverte de l'outil validée avec un client MCP.
+- Recherche DALO validée : document `F18005` retrouvé.
+- Transport `stdio` validé avec un serveur exécuté en sous-processus.
+- Tests automatisés ajoutés dans `tests/test_mcp_server.py`.
+- Tests MCP : 2/2 réussis en 4,35 s.
+- Tests globaux : 24/24 réussis en 19,15 s.
+
+**Limites actuelles :**
+- Seul `search_docs` est exposé.
+- Pas encore de démonstration dans un client MCP tiers.
+- Les autres outils seront intégrés après validation de leurs modules.
+- Aucun commit ni push effectué à cette étape.
+
+**Prochaines actions :**
+1. Compléter les tests de validation des arguments et des erreurs.
+2. Connecter le serveur à un client MCP externe.
+3. Documenter l'installation et l'utilisation du serveur.
+4. Préparer la livraison de la branche bonus MCP.
+
+
+### 18 octobre 2026 — validations complémentaires MCP
+
+- Gestion des erreurs avec `ToolError`.
+- Question vide rejetée avec un message explicite.
+- Valeur `k=0` rejetée avec un message explicite.
+- Absence de traceback inattendue pour ces erreurs.
+- Tests MCP : 4/4 réussis en 4,30 s.
+- Tests globaux : 26/26 réussis en 19,11 s.
+- Aucun échec détecté dans les tests existants.
+
+**Prochaine étape :** premier commit sur la branche dédiée,
+puis démonstration et documentation du client MCP externe.
+
+### 18 octobre 2026 — MCP Inspector : démonstration externe validée
+
+- Branche : `charles-bonus-mcp`.
+- Premier commit publié : `9144590`.
+- Client externe : MCP Inspector 2.9.0.
+- Connexion au serveur `assistant-hlm` via `stdio` : validée.
+- Outil découvert et exécuté : `search_docs`.
+- Question : « Qu'est-ce que le DALO ? »
+- Nombre de passages demandé : 5.
+- Nombre de passages retourné : 5.
+- Document retrouvé : `F18005` (Service-Public.fr).
+- Méthode : `hybrid_rrf+rerank`.
+- Latence observée : 9 068,57 ms.
+- Réponse structurée : identifiants, sources, URLs, textes et scores.
+- Le serveur MCP fournit des passages documentaires, sans génération de réponse par LLM.
+
+**Résultat :** fonctionnement du serveur MCP validé depuis
+une application cliente externe.
+
+**Suite :** documenter l'installation et faciliter la reproduction
+de la démonstration sur un autre ordinateur.
+
+### 19 octobre 2026 — intégration MCP et validations fonctionnelles
+
+- **Branche :** `charles-bonus-mcp-integration`
+- **Commit d'intégration :** `1319ab2`
+- **Version de main intégrée :** `580edc8`
+
+#### Intégration technique
+
+- Fusion des travaux MCP avec la version de main contenant les contributions d'Alexis et Gaby.
+- Conflits résolus dans `Docs/AVANCEMENT.md` et `uv.lock`.
+- Dépendances MCP, agent, RPLS, DVF et Streamlit conservées.
+- `uv lock --check` et `uv sync --locked` réussis.
+- Tests automatisés : **186 réussis, 1 désélectionné**, en 29,34 secondes.
+- Validation MCP réelle via un client `stdio` en sous-processus.
+- Outil découvert : `search_docs`.
+- Recherche DALO : 3 passages du document `F18005`, méthode `hybrid_rrf+rerank`, latence 8,3 s.
+- Branche d'intégration publiée sur GitHub.
+- Aucune modification apportée à `main`.
+
+#### Vérifications fonctionnelles via Streamlit
+
+- Interface Streamlit : lancement et affichage corrects.
+- Baseline BM25 : recherche DALO fonctionnelle.
+- Backend `rag` avec Ollama `qwen3:4b-instruct` : réponse DALO générée, citation `F18005`, latence 40,9 s.
+- Backend `agent` : appel réussi à `check_eligibility` pour un couple avec un enfant à Lyon et 28 000 euros de revenu fiscal.
+- Résultat éligibilité : PLAI non éligible ; PLUS et PLS éligibles.
+- RPLS Créteil : **15 133 logements sociaux**, millésime 2025, confirmés par appel Python direct.
+- DVF Créteil : 2024, 497 ventes et 3 548 euros/m² ; 2025, 608 ventes et 3 634 euros/m², confirmés par Python.
+- Demande de logements disponibles aujourd'hui à Créteil : abstention correcte, aucun logement inventé.
+- Backend `agent_tools` avec Ollama : recherche DALO, éligibilité et refus de divulgation du prompt système testés.
+- Dans certains tests `agent_tools`, mécanisme de secours utilisé lorsque Qwen3 n'appelle pas `final_answer`.
+
+#### Évaluation
+
+- `eval/check_golden.py` : 52 questions structurellement valides (20 dev, 32 test).
+- q036 (RPLS) et q037 (DVF) restent incomplètes et exclues des runs.
+- Évaluation baseline BM25 : 50 questions exécutées, aucune erreur.
+- Hit@5 baseline : 0,69 global ; 1,00 dev ; 0,35 test.
+- Latence médiane baseline : 2 ms.
+- Ces résultats valident l'exécution du pipeline, pas la justesse de toutes les réponses.
+
+#### Anomalies restant à traiter
+
+- Le backend `agent` associe parfois des citations juridiques non pertinentes aux résultats RPLS et DVF, malgré la provenance correcte renvoyée par les outils.
+- Sur une injection de prompt, le backend `agent` ne divulgue pas ses instructions, mais produit une réponse hors sujet au lieu d'un refus explicite.
+- Le backend `agent_tools` utilise parfois un repli de sortie structurée lorsque `final_answer` n'est pas appelé.
+- Lors du test d'éligibilité, `agent_tools` appelle aussi `social_housing_stats`, outil non nécessaire à cette question.
+- q036 demande le nombre de logements vacants, information absente du fichier RPLS utilisé : l'attente d'une réponse sans abstention doit être revue.
+- q037 nécessite une réponse de référence calculée à partir des appartements vendus à Villeurbanne en 2025.
+- Une évaluation end-to-end complète de la branche intégrée avec LLM reste à réaliser.
+
+**Conclusion :** intégration MCP techniquement fonctionnelle et tests majeurs réussis sur les scénarios exécutés. Les anomalies de qualité doivent être signalées à l'équipe avant la livraison finale.
+
+**Prochaines étapes :** finaliser `Docs/MCP.md`, transmettre les anomalies à Alexis, préparer une pull request pour revue et ne fusionner dans `main` qu'après validation de l'équipe.
+
+### 20 octobre 2026 — Corrections et validation finale
+
+**Branche :** `charles-finalisation-20261019`.
+
+#### Correction des citations statistiques
+
+- Modification de `src/agent/agent.py` sur une branche séparée.
+- Ajout des citations officielles provenant des outils RPLS et DVF.
+- Suppression des citations juridiques parasites dans les réponses statistiques lorsque la provenance de l outil est disponible.
+- Deux tests de non-régression ajoutés dans `tests/test_agent_provenance.py`.
+- Validation automatisée : 188 tests réussis, un désélectionné.
+- Tests réels avec Ollama et Streamlit : RPLS Créteil et DVF Créteil validés.
+- Les modifications du backend agent devront être relues par Alexis avant fusion.
+
+#### Finalisation du golden set
+
+- `q036` : abstention attendue pour la vacance des logements sociaux à Créteil, absente du fichier RPLS utilisé.
+- `q037` : médiane DVF 2025 des appartements vendus à Villeurbanne : 3 567 EUR/m2, sur 1 890 ventes.
+- `eval/check_golden.py` : 52 questions valides, sans avertissement.
+
+#### Évaluations
+
+- Baseline BM25 : 52 questions exécutées, aucune erreur.
+- Baseline : Hit@5 = 0,69 ; MRR = 0,57.
+- Évaluation Ollama `agent` sur trois questions : 3/3 traitées, sans erreur.
+- Évaluation complète des 52 questions avec Ollama : en cours au moment de cette mise à jour.
+- Les résultats définitifs seront ajoutés après la fin du run.
+
+#### Travaux restants
+
+- Analyser le rapport final des 52 questions avec Ollama.
+- Examiner les échecs et les problèmes de routage ou de citation.
+- Relancer les tests après toute correction supplémentaire.
+- Préparer la revue par Alexis et Gaby.
+- Publier les modifications, intégrer les branches validées et préparer le tag de livraison.
+
+
+### 20 octobre 2026 — Bilan de fin de matinée
+
+#### Évaluation complète de l'agent
+
+- Backend : `agent`, modèle Ollama `qwen3:4b-instruct`.
+- Golden set : 52 questions (20 développement, 32 test).
+- Hit@5 : 0,80 ; MRR : 0,65.
+- Précision des citations : 0,55.
+- Routage correct : 0,96.
+- Exactitude de l'éligibilité selon l'évaluation : 1,00.
+- Une erreur d'exécution sur 52 questions : erreur HTTP 500 d'Ollama sur `q044`.
+- Ces résultats correspondent au run initial, avant les derniers correctifs.
+- Ils ne constituent pas une garantie d'exactitude juridique ou factuelle
+  de toutes les réponses générées.
+
+#### Correctifs de routage et de données DVF
+
+- Routage ajusté : le transfert du bail après décès et le surloyer
+  d'un locataire HLM relèvent de `documents`, et non d'`eligibilite`.
+- Ajout des paramètres `type_local` et `annee` au routage DVF.
+- Extraction déterministe d'une année explicitement mentionnée.
+- En présence de plusieurs années distinctes, aucune année unique
+  n'est choisie arbitrairement.
+- Test réel avec Ollama pour `q037` : appel de `market_prices`
+  avec Villeurbanne, Appartement, 2025.
+- Résultat exact : 3 567 EUR/m2, 1 890 ventes, citation officielle DVF.
+- Tests de non-régression ajoutés dans `tests/test_agent_dvf_filters.py`.
+
+#### Analyse des limites du retrieval juridique
+
+- `q021` : document pertinent `F1170`, présent dans le corpus,
+  meilleur rang E5 21, meilleur rang RRF 45.
+- `q022` : document pertinent `F21051`, présent dans le corpus,
+  meilleur rang E5 24, meilleur rang RRF 59.
+- Ces documents sont absents des 30 candidats transmis au reranker.
+- L'expérience MiniLM à 60 candidats les classe respectivement
+  aux rangs 35 et 44, donc toujours hors du top 5.
+- Les réponses complètes de l'agent sur ces deux questions restent
+  juridiquement insuffisantes malgré le routage corrigé.
+- Configuration du retrieval conservée pour la livraison ;
+  les variantes expérimentales ne sont pas adoptées.
+- Les résultats expérimentaux sur ces questions de test ne doivent
+  pas être présentés comme une évaluation indépendante.
+
+#### Validation automatisée
+
+- `uv run pytest -q` : 190 tests réussis, un désélectionné.
+- `uv run python eval/check_golden.py` : 52 questions valides.
+- `git diff --check` : aucune anomalie détectée.
+- Branche de travail : `charles-finalisation-20261019`.
+- Aucune fusion dans `main` à ce stade.
+
+#### Prochaines actions
+
+- Relire le diff final et vérifier la documentation.
+- Créer un commit local de finalisation.
+- Soumettre les changements à Alexis et Gaby pour revue.
+- Ne fusionner dans `main` qu'après validation collective.
+
+### 20 octobre 2026 — Validation fonctionnelle et revue GitHub
+
+#### Démonstrations Streamlit
+
+- Interface lancée avec `uv run streamlit run app/streamlit_app.py`.
+- Backend `agent`, recherche hybride avec reranker,
+  modèle Ollama `qwen3:4b-instruct`, 5 passages.
+- DALO : réponse générée, document officiel `F18005`
+  retrouvé et cité.
+- Éligibilité : couple avec un enfant à Lyon, RFR de
+  28 000 EUR ; outil `check_eligibility` exécuté.
+  PLAI non éligible, PLUS et PLS éligibles.
+- RPLS : Créteil, millésime 2025, 15 133 logements sociaux ;
+  appel `social_housing_stats` réussi, source SDES citée.
+- DVF : Villeurbanne, appartements vendus en 2025,
+  prix médian de 3 567 EUR/m2 ; appel `market_prices`
+  réussi, source DGFiP citée.
+- Les quatre scénarios ont été validés dans l'interface.
+- Certaines réponses prennent plusieurs dizaines de secondes
+  avec le modèle Ollama exécuté localement.
+
+#### Serveur MCP et dépendances
+
+- `uv run pytest -q tests/test_mcp_server.py` :
+  4 tests réussis en 6,65 secondes.
+- Validation antérieure du protocole MCP depuis un client externe.
+- `uv lock --check` : réussi, 125 packages résolus.
+- `uv sync --locked` : réussi, 100 packages vérifiés.
+- Version Python utilisée : 3.12.7.
+
+#### GitHub et revue collective
+
+- Branche : `charles-finalisation-20261019`.
+- Dernier commit fonctionnel : `5bfd5c4`.
+- Branche publiée et synchronisée avec GitHub.
+- Pull request : `#4`, vers `main`.
+- Adresse : https://github.com/Charles-Scannavino/Projet_Generative_AI/pull/4
+- PR déclarée prête pour revue, sans conflit Git signalé.
+- Demandes de revue envoyées à `Alexis5131` et `GabyD-web`.
+- Aucune approbation reçue au moment de la vérification.
+- Aucun contrôle CI GitHub rapporté sur la branche.
+- Aucune fusion réalisée dans `main`.
+
+#### Limites et travaux restants
+
+- Réponses juridiques `q021` et `q022` encore insuffisantes ;
+  limites du retrieval décrites dans la section précédente.
+- Le succès des tests automatisés ne garantit pas
+  l'exactitude juridique de toutes les réponses.
+- Obtenir les revues d'Alexis et Gaby.
+- Vérifier la version commune après éventuelle fusion.
+- Préparer les scénarios et la présentation de soutenance.
+- Ne pas fusionner sans validation collective.

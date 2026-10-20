@@ -424,6 +424,201 @@ Qwen3 peut afficher un mode de raisonnement `Thinking...`. Pour les tests docume
 
 Le mode de raisonnement devra être évalué séparément si nous décidons de l'utiliser, car il augmente le nombre de tokens et la latence.
 
+## Installation reproductible depuis GitHub
+
+Cette procédure permet de préparer le projet sur un nouvel ordinateur,
+sans dépendre des chemins locaux utilisés pendant le développement.
+
+### Étape 1 — Cloner le dépôt
+
+Le dépôt GitHub est privé : disposer des autorisations nécessaires.
+
+~~~bash
+git clone https://github.com/Charles-Scannavino/Projet_Generative_AI.git
+cd Projet_Generative_AI
+~~~
+
+La version complète intégrant le MCP et les dernières corrections
+sera disponible sur main après validation et fusion des branches.
+
+### Étape 2 — Installer Python et les dépendances
+
+Prérequis : Python 3.12, uv et Git.
+
+Sur macOS avec Homebrew :
+
+~~~bash
+brew install uv python@3.12
+~~~
+
+Depuis la racine du projet :
+
+~~~bash
+uv sync --python 3.12 --locked
+uv run python --version
+~~~
+
+La commande uv sync installe les dépendances définies dans
+pyproject.toml et verrouillées dans uv.lock.
+
+Sur un nouvel ordinateur, uv peut créer un environnement .venv
+à la racine du dépôt.
+
+### Étape 3 — Installer et démarrer Ollama
+
+Sur macOS avec Homebrew :
+
+~~~bash
+brew install ollama
+brew services start ollama
+~~~
+
+Télécharger le modèle génératif retenu :
+
+~~~bash
+ollama pull qwen3:4b-instruct
+ollama list
+~~~
+
+Modèle utilisé : qwen3:4b-instruct, environ 2,5 Go.
+
+Le modèle fonctionne localement : aucune clé API OpenRouter
+est nécessaire pour les backends Ollama.
+
+### Étape 4 — Télécharger les modèles de recherche documentaire
+
+Le retrieval utilise deux modèles Hugging Face :
+
+- Embeddings : intfloat/multilingual-e5-small
+- Reranker : cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+
+Ces modèles sont chargés automatiquement par sentence-transformers
+lors de la première utilisation du moteur de recherche.
+
+Depuis la racine du projet, lancer :
+
+~~~bash
+uv run python -c "from src.retrieval import warmup; warmup(); print(\"Retrieval pret\")"
+~~~
+
+Au premier lancement, les poids des modèles peuvent être téléchargés
+depuis Hugging Face. Une connexion Internet est alors nécessaire.
+
+Les modèles téléchargés sont conservés dans les caches locaux
+Hugging Face. Les embeddings et index calculés par le projet
+sont mis en cache dans data/indexes/.
+
+Les lancements suivants peuvent réutiliser les modèles et caches
+existants, si leurs versions et les données source ne changent pas.
+
+Le modèle BAAI/bge-reranker-v2-m3, plus volumineux, ne fait pas
+partie du pipeline par défaut. Il sert aux comparaisons expérimentales.
+
+### Étape 5 — Vérifier les données du projet
+
+Le retrieval nécessite notamment :
+
+- data/processed/rag_documents.jsonl
+- data/processed/chunks/fixed_300_60.jsonl
+
+Les outils statistiques utilisent aussi les fichiers traités RPLS,
+DVF et les référentiels de communes.
+
+Vérifier les fichiers documentaires :
+
+~~~bash
+ls -lh data/processed/rag_documents.jsonl
+ls -lh data/processed/chunks/fixed_300_60.jsonl
+~~~
+
+Les principaux fichiers de données traitées nécessaires au
+fonctionnement du projet sont versionnés dans GitHub :
+
+- rag_documents.jsonl et les chunks de référence ;
+- communes_ref.csv ;
+- rpls_communes.csv ;
+- dvf_communes.csv ;
+- plafonds_hlm_2026.csv.
+
+Ils sont donc récupérés automatiquement lors du clonage.
+
+Les données brutes supplémentaires, les modèles téléchargés et les
+caches restent distincts et ne sont pas nécessairement versionnés.
+
+Si un fichier nécessaire manque après le clonage, il faut récupérer
+les données prévues par le projet et suivre les étapes de préparation
+décrites dans le README et dans les scripts de preprocessing.
+
+Installer les dépendances et télécharger les modèles ne suffit pas
+à reconstituer automatiquement un jeu de données absent.
+
+### Étape 6 — Tester la recherche documentaire
+
+~~~bash
+uv run python -m src.retrieval.search "Qu est-ce que le DALO ?"
+~~~
+
+Résultat attendu : une recherche documentaire contenant notamment
+la fiche Service-Public F18005, avec les passages et leurs sources.
+
+### Étape 7 — Tester les composants
+
+~~~bash
+uv run python eval/check_golden.py
+uv run pytest -q
+~~~
+
+Ces commandes vérifient le jeu de référence et les tests automatisés
+exécutables sans appel réel à une API LLM.
+
+### Étape 8 — Lancer la plateforme Streamlit
+
+Depuis la racine du projet :
+
+~~~bash
+uv run streamlit run app/streamlit_app.py
+~~~
+
+Ouvrir dans le navigateur le lien affiché par Streamlit,
+généralement http://localhost:8501.
+
+Configuration locale recommandée :
+
+- Fournisseur : Ollama.
+- Modèle : qwen3:4b-instruct.
+- Retrieval : hybride avec reranker.
+- Nombre de passages : 5.
+
+Les backends baseline, rag, agent et agent_tools permettent
+de comparer plusieurs stratégies de réponse.
+
+### Étape 9 — Utiliser le bonus MCP
+
+Le serveur MCP peut être démarré avec :
+
+~~~bash
+uv run python -m src.mcp_server
+~~~
+
+Il utilise le transport stdio et attend un client MCP.
+Il ne présente donc pas directement une interface dans le Terminal.
+
+Consulter Docs/MCP.md pour la documentation complète,
+les tests et la démonstration avec MCP Inspector.
+
+### Étape 10 — Reproductibilité et limites
+
+- Python et les bibliothèques sont gérés par uv.
+- Le modèle génératif est téléchargé via Ollama.
+- E5 et MiniLM sont récupérés via Hugging Face.
+- Les index et embeddings peuvent être reconstruits automatiquement
+  lorsque les données traitées nécessaires sont disponibles.
+- Les temps de chargement dépendent de la machine et des caches.
+- Une installation neuve doit être validée sur les fichiers réellement
+  distribués avec la version finale du projet.
+
+---
+
 ## Ollama : rôle dans le projet
 
 Ollama **n'est pas un moteur de recherche Web**. Dans notre configuration, il exécute localement `qwen3:4b-instruct` sur le Mac.
