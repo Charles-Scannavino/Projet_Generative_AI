@@ -10,7 +10,7 @@
 
 **Validation :** **195 tests réussis, un désélectionné** ; `eval/check_golden.py` valide la **structure de 52 questions** (20 `dev`, 32 `test`). Cette validation ne garantit pas la justesse de toutes les réponses. Les limites juridiques observées pour `q021` et `q022` restent documentées. Le run local `agent` de 52 questions ne vaut pas évaluation exhaustive de `agent_tools --provider ollama`.
 
-**Livraison :** PR #4 et #5 fusionnées ; commit de référence `32ec0a3` sur `main`, tag **`v1.0`** publié le 20 octobre 2026.
+**Livraison :** PR #4 et #5 fusionnées ; bonus MCP intégré au commit `32ec0a3`. Un commit d'évaluation supplémentaire (`24702f`) est la **cible actuelle du tag `v1.0`** publié le 20 octobre 2026.
 
 **Soutenance :** une **vidéo de secours de Streamlit a été enregistrée** ; une **démonstration Streamlit en direct est prévue le 21 octobre 2026**. La vidéo servira de repli en cas de problème technique ou de latence.
 
@@ -198,7 +198,7 @@ En complément du périmètre principal, deux pistes peuvent apporter une valeur
 - [x] `.gitignore` adapté au projet (Python/Colab, données extraites, index, résultats d'évaluation, secrets).
 - [ ] Vérifier qu'aucune clé API n'est présente.
 - [x] Préparer et enregistrer une vidéo de secours Streamlit ; démonstration en direct prévue à l'oral du 21 octobre (confirmé par le présentateur).
-- [x] Créer et publier le tag `v1.0` sur le commit `32ec0a3` de `main`.
+- [x] Créer et publier le tag `v1.0` (cible vérifiée : commit `24702f` ; le commit `32ec0a3` correspond à l'intégration du bonus MCP).
 
 ## 3. Résultats observés à ce jour
 
@@ -1036,7 +1036,7 @@ moyennes ni des benchmarks comparatifs.
 - Version initiale fusionnée dans main via la PR #4,
   commit 8c0e567.
 - Extension développée sur charles-bonus-mcp-complet.
-- Statut final : l'extension MCP a été fusionnée via la PR #5, puis publiée dans `main` au commit `32ec0a3` avec le tag `v1.0`.
+- Statut final : extension MCP fusionnée via la PR #5 (commit `32ec0a3`) ; le tag `v1.0` pointe vers le commit ultérieur `24702f` d'ablation retrieval sur le split test.
 
 ### 20 octobre 2026 — Bilan final et soutenance
 
@@ -1048,7 +1048,7 @@ Cette entrée met à jour la situation du projet à la livraison. Les descriptio
 - Interface Streamlit fonctionnelle, avec sources et trace d'exécution.
 - Serveur MCP proposant quatre outils, vérifiés dans MCP Inspector v2.11.0 ; **9 tests MCP réussis**.
 - Validation finale sur `main` : **195 tests réussis**, un désélectionné ; **52 questions structurellement valides** (20 développement, 32 test).
-- PR #4 et #5 fusionnées ; commit `32ec0a3` ; tag **`v1.0`** publié, sans modification rétroactive.
+- PR #4 et #5 fusionnées ; bonus MCP au commit `32ec0a3` ; tag **`v1.0`** actuellement associé au commit `24702f`. Les corrections documentaires sur `main` n'affectent pas ce tag.
 
 #### Démonstration de soutenance
 - **Un enregistrement vidéo Streamlit de secours a été réalisé** par le présentateur ; son emplacement de stockage n'est pas documenté dans le dépôt.
