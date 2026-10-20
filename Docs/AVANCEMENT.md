@@ -879,3 +879,63 @@ de la démonstration sur un autre ordinateur.
 - Relancer les tests après toute correction supplémentaire.
 - Préparer la revue par Alexis et Gaby.
 - Publier les modifications, intégrer les branches validées et préparer le tag de livraison.
+
+
+### 20 octobre 2026 — Bilan de fin de matinée
+
+#### Évaluation complète de l'agent
+
+- Backend : `agent`, modèle Ollama `qwen3:4b-instruct`.
+- Golden set : 52 questions (20 développement, 32 test).
+- Hit@5 : 0,80 ; MRR : 0,65.
+- Précision des citations : 0,55.
+- Routage correct : 0,96.
+- Exactitude de l'éligibilité selon l'évaluation : 1,00.
+- Une erreur d'exécution sur 52 questions : erreur HTTP 500 d'Ollama sur `q044`.
+- Ces résultats correspondent au run initial, avant les derniers correctifs.
+- Ils ne constituent pas une garantie d'exactitude juridique ou factuelle
+  de toutes les réponses générées.
+
+#### Correctifs de routage et de données DVF
+
+- Routage ajusté : le transfert du bail après décès et le surloyer
+  d'un locataire HLM relèvent de `documents`, et non d'`eligibilite`.
+- Ajout des paramètres `type_local` et `annee` au routage DVF.
+- Extraction déterministe d'une année explicitement mentionnée.
+- En présence de plusieurs années distinctes, aucune année unique
+  n'est choisie arbitrairement.
+- Test réel avec Ollama pour `q037` : appel de `market_prices`
+  avec Villeurbanne, Appartement, 2025.
+- Résultat exact : 3 567 EUR/m2, 1 890 ventes, citation officielle DVF.
+- Tests de non-régression ajoutés dans `tests/test_agent_dvf_filters.py`.
+
+#### Analyse des limites du retrieval juridique
+
+- `q021` : document pertinent `F1170`, présent dans le corpus,
+  meilleur rang E5 21, meilleur rang RRF 45.
+- `q022` : document pertinent `F21051`, présent dans le corpus,
+  meilleur rang E5 24, meilleur rang RRF 59.
+- Ces documents sont absents des 30 candidats transmis au reranker.
+- L'expérience MiniLM à 60 candidats les classe respectivement
+  aux rangs 35 et 44, donc toujours hors du top 5.
+- Les réponses complètes de l'agent sur ces deux questions restent
+  juridiquement insuffisantes malgré le routage corrigé.
+- Configuration du retrieval conservée pour la livraison ;
+  les variantes expérimentales ne sont pas adoptées.
+- Les résultats expérimentaux sur ces questions de test ne doivent
+  pas être présentés comme une évaluation indépendante.
+
+#### Validation automatisée
+
+- `uv run pytest -q` : 190 tests réussis, un désélectionné.
+- `uv run python eval/check_golden.py` : 52 questions valides.
+- `git diff --check` : aucune anomalie détectée.
+- Branche de travail : `charles-finalisation-20261019`.
+- Aucune fusion dans `main` à ce stade.
+
+#### Prochaines actions
+
+- Relire le diff final et vérifier la documentation.
+- Créer un commit local de finalisation.
+- Soumettre les changements à Alexis et Gaby pour revue.
+- Ne fusionner dans `main` qu'après validation collective.
