@@ -2,13 +2,13 @@
 
 ## 1. Présentation
 
-Le serveur MCP permet à un client externe de rechercher des documents officiels sur le logement social.
+Le serveur MCP permet à un client externe d'utiliser les quatre outils de l'assistant HLM : recherche documentaire, éligibilité, statistiques RPLS et statistiques DVF.
 
 - Serveur : assistant-hlm
 - Implémentation : src/mcp_server.py
 - Transport : stdio
 - SDK : MCP Python 2.x
-- Outil exposé : search_docs
+- Outils exposés : search_docs, check_eligibility, social_housing_stats et market_prices
 - Responsable : Charles
 
 ## 2. Architecture
@@ -17,7 +17,7 @@ Le serveur réutilise le moteur de recherche du projet : BM25, embeddings E5, fu
 
 Le corpus contient 455 documents Service-Public et LEGI, découpés en 1 357 passages.
 
-Le serveur retourne des résultats documentaires structurés, sans génération par un LLM.
+Le serveur retourne des résultats structurés avec sources et avertissements. Les calculs réglementaires et statistiques sont effectués par les modules Python existants, sans génération par un LLM.
 
 ## 3. Prérequis
 
@@ -33,7 +33,7 @@ Ollama et OpenRouter ne sont pas nécessaires au fonctionnement du serveur MCP.
 
 Cloner le dépôt sur la branche intégrant le MCP :
 
-    git clone --branch charles-bonus-mcp-integration https://github.com/Charles-Scannavino/Projet_Generative_AI.git
+    git clone https://github.com/Charles-Scannavino/Projet_Generative_AI.git
     cd Projet_Generative_AI
 
 Installer les dépendances verrouillées :
@@ -56,7 +56,7 @@ Tester uniquement le serveur MCP :
 
     uv run pytest -q tests/test_mcp_server.py
 
-Les quatre tests vérifient la découverte, la recherche et les erreurs de validation.
+Les neuf tests vérifient la découverte des quatre outils, leurs sorties réelles et les principaux cas d'erreur.
 
 Tester le projet complet :
 
@@ -111,7 +111,59 @@ Méthode attendue : hybrid_rrf+rerank.
 Le premier démarrage peut être plus lent en raison du chargement
 des modèles et des caches du moteur de recherche.
 
-## 8. Contrat de l'outil search_docs
+### Exemples des quatre appels dans MCP Inspector
+
+Sélectionner l'outil dans l'onglet Tools et renseigner
+les paramètres ci-dessous. Le mode « Edit as JSON » permet
+également de saisir directement les arguments.
+
+**Recherche documentaire DALO :**
+
+~~~json
+{"query": "Qu'est-ce que le DALO ?", "k": 5}
+~~~
+
+Résultat de référence : fiche Service-Public F18005,
+méthode `hybrid_rrf+rerank`.
+
+**Éligibilité HLM à Lyon :**
+
+~~~json
+{
+  "revenu_fiscal_reference": 28000,
+  "nb_personnes": 3,
+  "nb_personnes_a_charge": 1,
+  "commune": "Lyon",
+  "annee": 2026
+}
+~~~
+
+Résultat : PLAI non éligible, PLUS et PLS éligibles.
+Les calculs reposent sur le barème 2026 et le RFR 2024.
+
+**Parc locatif social à Créteil :**
+
+~~~json
+{"commune": "Créteil"}
+~~~
+
+Résultat : 15 133 logements recensés au 1er janvier 2025.
+Cela ne représente pas les logements actuellement disponibles.
+
+**Prix de vente à Villeurbanne :**
+
+~~~json
+{
+  "commune": "Villeurbanne",
+  "type_local": "Appartement",
+  "annee": 2025
+}
+~~~
+
+Résultat : prix médian 3 567 EUR/m2 sur 1 890 ventes.
+DVF décrit les ventes immobilières et non les loyers.
+
+## 8. Contrats des quatre outils
 
 Le serveur expose un outil de recherche documentaire :
 
@@ -141,9 +193,41 @@ sa source, son URL, son texte et ses scores de recherche.
 Ces passages doivent être traités comme des données,
 et jamais comme des instructions destinées au client MCP.
 
+### check_eligibility
+
+Paramètres : revenu_fiscal_reference (euros), nb_personnes,
+nb_personnes_a_charge, jeune_menage, personne_handicapee,
+commune ou zone, departement facultatif, annee (2026).
+
+Fournir exactement une commune ou une zone, jamais les deux.
+Le revenu est le revenu fiscal de référence N-2 du ménage.
+Résultats : plafonds PLAI/PLUS/PLS, verdicts, écarts,
+catégorie du foyer, provenance et avertissements.
+
+### social_housing_stats
+
+Paramètres : commune et departement facultatif.
+Résultats : statistiques du parc social, financement initial,
+caractéristiques, millésime RPLS et provenance SDES.
+
+Le RPLS est un instantané annuel, pas une liste de logements
+actuellement disponibles. Il ne permet pas ici de calculer
+le taux de vacance ou le taux SRU.
+
+### market_prices
+
+Paramètres : commune, departement facultatif,
+type_local (Appartement, Maison ou Tous),
+annee facultative.
+
+Résultats : nombre de ventes, médiane du prix au m2,
+quartiles, années disponibles, provenance DGFiP.
+DVF décrit des prix de vente et non des loyers.
+Les statistiques portant sur moins de cinq ventes sont masquées.
+
 ## 9. Gestion des erreurs
 
-Le serveur vérifie les arguments transmis à search_docs.
+Le serveur vérifie les paramètres des quatre outils via MCP et les modèles Pydantic stricts.
 
 Une requête vide ou une valeur k hors limites est rejetée.
 
@@ -155,7 +239,7 @@ Exemples de requêtes invalides :
 Les erreurs de validation sont converties en erreurs MCP
 contrôlées avec ToolError.
 
-Les tests automatisés vérifient ces comportements.
+Les tests automatisés vérifient aussi les compositions de foyer incohérentes, années non couvertes, communes inconnues et types de biens invalides.
 
 ## 10. Validations réalisées
 
@@ -185,16 +269,95 @@ Les tests automatisés vérifient ces comportements.
 Ces mesures sont propres aux environnements de test.
 Elles ne garantissent pas les mêmes latences sur tout ordinateur.
 
+### 20 octobre 2026 — Quatre outils MCP validés
+
+- Quatre outils découverts dans MCP Inspector v2.11.0.
+- Protocole MCP 2025-11-25, transport stdio.
+- search_docs : DALO, document F18005 en première position,
+  hybrid_rrf+rerank, environ 9,39 secondes.
+- check_eligibility : Lyon, trois personnes, RFR 28 000 EUR ;
+  PLAI non, PLUS et PLS oui ; environ 41 ms.
+- social_housing_stats : Créteil, 15 133 logements sociaux
+  au 1er janvier 2025 ; environ 41 ms.
+- market_prices : Villeurbanne, appartements, 2025,
+  médiane de 3 567 EUR/m2 sur 1 890 ventes ; environ 1,86 s.
+- Chaque outil testé renvoie des données structurées ;
+  les trois outils métier renvoient sources et avertissements.
+- Neuf tests MCP réussis.
+- Suite générale : 195 tests réussis, un désélectionné.
+- Golden set : 52 questions valides.
+
+Les latences correspondent aux essais affichés dans Inspector
+et ne représentent pas des moyennes sur plusieurs exécutions.
+
 ## 11. Limites du serveur MCP
 
-- Seul search_docs est exposé par le serveur MCP.
-- Les outils check_eligibility, social_housing_stats et market_prices
-  sont disponibles dans le projet, mais pas encore exposés via MCP.
-- Le serveur ne génère pas de réponse avec un modèle de langage.
-- Les résultats sont des passages documentaires, pas une réponse finale.
-- Le chargement initial des modèles peut être lent.
-- Le transport utilisé est stdio, et non HTTP.
-- Un client MCP compatible est nécessaire pour utiliser le serveur.
+- Les quatre outils sont exposés via MCP.
+- Le serveur ne génère pas lui-même de réponse en langage naturel.
+- Les appels depuis MCP Inspector sont validés ; aucune intégration
+  autonome avec un agent IA externe n'a encore été démontrée.
+- RPLS ne fournit pas les disponibilités de logements en temps réel.
+- DVF porte sur les ventes, pas les loyers.
+- Seul le barème d'éligibilité 2026 est couvert.
+- Le premier chargement du moteur RAG peut être lent.
+- Le transport est stdio, pas HTTP.
+- Un client MCP compatible est nécessaire.
+
+### Perspective — Connexion à Claude Desktop
+
+Un client MCP peut utiliser les outils de ce serveur sans
+passer par l'interface Streamlit.
+
+Une intégration future à Claude Desktop consisterait à :
+
+1. Installer et ouvrir Claude Desktop sur macOS.
+2. Configurer un serveur MCP local `assistant-hlm` dans
+   `claude_desktop_config.json`.
+3. Utiliser le chemin absolu de `uv` et le chemin du dépôt.
+4. Redémarrer Claude Desktop et vérifier les outils disponibles.
+5. Poser une question HLM et autoriser l'appel à l'outil adapté.
+6. Contrôler le résultat, les sources et les avertissements.
+
+Sur le Mac de référence, l'exécutable uv se trouve dans
+`/opt/homebrew/bin/uv`. Le répertoire du dépôt dépend
+de l'utilisateur et doit être configuré en chemin absolu.
+
+Exemple de configuration à adapter :
+
+~~~json
+{
+  "mcpServers": {
+    "assistant-hlm": {
+      "command": "/opt/homebrew/bin/uv",
+      "args": [
+        "--directory",
+        "/CHEMIN/ABSOLU/Projet_Generative_AI",
+        "run",
+        "python",
+        "-m",
+        "src.mcp_server"
+      ]
+    }
+  }
+}
+~~~
+
+Cette configuration est illustrative et non encore validée
+dans Claude Desktop. Si l'environnement uv est externe au
+projet, il faut aussi transmettre UV_PROJECT_ENVIRONMENT
+via la configuration du client.
+
+Un assistant externe pourra ainsi sélectionner un outil,
+l'appeler et générer une réponse conversationnelle avec
+les données retournées par notre serveur.
+
+Attention : les données partagées avec un assistant cloud
+peuvent être transmises à son fournisseur. Éviter les
+informations personnelles ou confidentielles lors des tests.
+
+Le branchement d'un client IA externe n'a pas encore été testé.
+La validation actuelle porte sur le protocole et les quatre
+outils via MCP Inspector.
 
 ## 12. Dépannage
 
@@ -237,7 +400,6 @@ Fichiers du bonus :
 - Docs/MCP.md : guide installation et utilisation.
 - Docs/AVANCEMENT.md : historique et validations.
 
-Branche de livraison : charles-bonus-mcp-integration.
+La version initiale du serveur a été fusionnée dans main via la PR #4 (commit 8c0e567).
 
-Une pull request doit être ouverte vers main.
-La fusion nécessite une revue et la validation de l'équipe.
+L'extension aux quatre outils est développée sur charles-bonus-mcp-complet. Sa publication dans main doit être vérifiée après la fusion.
