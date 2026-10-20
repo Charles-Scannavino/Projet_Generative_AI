@@ -4,11 +4,12 @@
 
 Backends :
 - "baseline"    : BM25 seul, sans LLM (src/agent/baseline.py)
-- "rag"         : search_docs + Qwen3, sans choix d'outil (src/agent/rag.py)
+- "rag"         : search_docs + LLM, sans choix d'outil (src/agent/rag.py, module de
+                  Charles) ; option `provider` : ollama (défaut), openrouter, anthropic
 - "agent"       : recherche systématique + formulaire JSON rempli par Qwen3 local,
                   Python choisit et exécute l'outil (src/agent/agent.py)
 - "agent_tools" : tool calling natif, le LLM enchaîne les outils ; API via OpenRouter
-                  ou Ollama, options `provider` et `model` (src/agent/tool_agent.py)
+                  Anthropic ou Ollama, options `provider` et `model` (src/agent/tool_agent.py)
 """
 
 from __future__ import annotations

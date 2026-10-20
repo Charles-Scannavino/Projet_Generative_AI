@@ -1,8 +1,8 @@
-# Paramètres de l'agent. Les secrets (OPENROUTER_API_KEY) sont lus dans .env uniquement.
+# Paramètres des LLM. Les secrets (OPENROUTER_API_KEY, ANTHROPIC_API_KEY) sont lus dans .env uniquement.
 # Surcharge possible par variable d'environnement, ex. HLM_AGENT__BACKEND=ollama
 
 agent:
-  backend: openrouter            # openrouter | ollama
+  backend: openrouter            # openrouter | ollama | anthropic (agent_tools)
   temperature: 0
   seed: 42
   max_steps: 6                   # tours LLM maximum par question
@@ -23,9 +23,17 @@ agent:
       # OLLAMA_NUM_CTX (8 192 par défaut, fixé à chaque requête). L'endpoint /v1
       # imposerait le contexte du serveur (4 096 sur une machine à 8 Go).
       model: qwen3:4b-instruct   # « qwen3:4b » = variante Thinking (lente)
+    anthropic:
+      # API Messages d'Anthropic (SDK `anthropic`). Claude Opus 5.5 : thinking adaptatif
+      # toujours actif, ni `temperature` ni `tool_choice` forcé (400) ; effort explicite.
+      model: claude-opus-5-5
+      effort: medium
+      max_tokens: 16000
 
   # Repli si le fournisseur ne renvoie pas le coût (OpenRouter renvoie usage.cost).
   # Relevé sur https://openrouter.ai/api/v1/models le 13 octobre 2026.
   prices_usd_per_mtok:
     "openai/gpt-4.1-mini": {input: 0.40, output: 1.60}
     "qwen3:4b-instruct": {input: 0.0, output: 0.0}
+    # Tarif Anthropic (API directe, sans cache) : l'API ne renvoie pas le coût, il est calculé.
+    "claude-opus-5-5": {input: 4.0, output: 20.0}

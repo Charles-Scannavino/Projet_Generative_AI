@@ -4,13 +4,13 @@
 
 ## 1. État global
 
-**État de référence au 20 octobre 2026 — projet livré :** le corpus final contient **455 documents** (117 Service-Public et 338 LEGI) et **1 357 chunks** selon `fixed_300_60`. Le retrieval `search_docs` associe BM25, embeddings E5, fusion RRF et reranking MiniLM. Les backends RAG et agent utilisent `qwen3:4b-instruct` via Ollama, des sorties structurées Pydantic, des citations contrôlées et une stratégie d'abstention. Les calculs d'éligibilité, les statistiques RPLS et les prix DVF sont produits par des outils Python déterministes.
+**État de référence au 21 octobre 2026 — projet livré et validé sans notebook :** le corpus final contient **455 documents** (117 Service-Public et 338 LEGI) et **1 357 chunks** selon `fixed_300_60`. Le retrieval `search_docs` associe BM25, embeddings E5, fusion RRF et reranking MiniLM. Les backends RAG et agent utilisent `qwen3:4b-instruct` via Ollama, des sorties structurées Pydantic, des citations contrôlées et une stratégie d'abstention. Les calculs d'éligibilité, les statistiques RPLS et les prix DVF sont produits par des outils Python déterministes.
 
 **Interfaces et bonus :** l'application `app/streamlit_app.py` affiche les réponses, les sources et les traces d'outils. Le serveur `src/mcp_server.py` expose **quatre outils MCP** (recherche, éligibilité, RPLS, DVF), validés dans MCP Inspector v2.11.0. La connexion à Claude Desktop reste une perspective non testée.
 
-**Validation :** **195 tests réussis, un désélectionné** ; `eval/check_golden.py` valide la **structure de 52 questions** (20 `dev`, 32 `test`). Cette validation ne garantit pas la justesse de toutes les réponses. Les limites juridiques observées pour `q021` et `q022` restent documentées. Le run local `agent` de 52 questions ne vaut pas évaluation exhaustive de `agent_tools --provider ollama`.
+**Validation (21 octobre, branche sans notebook validée) :** **215 tests réussis, 2 désélectionnés** ; les 9 tests MCP réussissent également. La version antérieure livrée le 20 octobre comptait 195 tests réussis et un désélectionné. ; `eval/check_golden.py` valide la **structure de 52 questions** (20 `dev`, 32 `test`). Cette validation ne garantit pas la justesse de toutes les réponses. Les limites juridiques observées pour `q021` et `q022` restent documentées. Le run local `agent` de 52 questions ne vaut pas évaluation exhaustive de `agent_tools --provider ollama`.
 
-**Livraison :** PR #4 et #5 fusionnées ; bonus MCP intégré au commit `32ec0a3`. Un commit d'évaluation supplémentaire (`24702f`) est la **cible actuelle du tag `v1.0`** publié le 20 octobre 2026.
+**Livraison :** PR #4 et #5 fusionnées ; bonus MCP intégré au commit `32ec0a3`. Le RAG amélioré par Alexis et les tests Anthropic sont intégrés au code de la version sans notebook ; les tests API Anthropic réels restent à effectuer. Un commit d'évaluation supplémentaire (`24702f`) est la **cible actuelle du tag `v1.0`** publié le 20 octobre 2026.
 
 **Soutenance :** une **vidéo de secours de Streamlit a été enregistrée** ; une **démonstration Streamlit en direct est prévue le 21 octobre 2026**. La vidéo servira de repli en cas de problème technique ou de latence.
 
@@ -1071,3 +1071,61 @@ Cette entrée met à jour la situation du projet à la livraison. Les descriptio
 - **128 commits** analysés, **370,97 Mo** parcourus.
 - Le contrôle automatisé a été exécuté et documenté. Il ne constitue pas une certification d'absence de secrets ; une vérification manuelle resterait nécessaire pour lever toute incertitude.
 - Aucune modification de l'historique Git ni du tag `v1.0` n'a été réalisée. Le rapport local n'a pas été publié sur GitHub.
+
+### 20 octobre 2026 — RAG de Charles intégré et fournisseur Anthropic (Alexis)
+
+#### RAG (`src/agent/rag.py`)
+
+- `answer_with_rag` reprend la logique de la PR #2 (Charles) : prompt système
+  à 7 règles, sortie JSON contrainte `{answer, citation_document_ids, abstained}`,
+  passages transmis au LLM en JSON (document_id, source, titre, article, URL, texte).
+- Adaptation au contrat commun : `AssistantResponse`, façade `ask()` et
+  fonctions partagées (`passages_from`, `unsupported_numbers`, `error_response`)
+  conservées ; aucune exception ne remonte à l'interface ni à `run_eval`.
+- Contrôles stricts de Charles convertis en abstention tracée dans `warnings` :
+  citation hors contexte, réponse non abstenue sans citation ; une abstention
+  ne garde aucune citation. Les citations LEGI portent leur numéro d'article.
+- Fournisseur au choix : Ollama (défaut), OpenRouter ou Anthropic.
+
+#### Fournisseur Anthropic (bonus local vs API)
+
+- `AnthropicClient` (SDK officiel `anthropic` 1.16.0), clé `ANTHROPIC_API_KEY`
+  lue uniquement depuis `.env`, modèle par défaut **Claude Opus 5.5**
+  (`claude-opus-5-5`, effort `medium`, `max_tokens` 16 000, 4 $ / 20 $ par MTok).
+- Disponible pour `rag`, `agent_tools` et le juge de `run_eval`
+  (`--provider anthropic`, `--judge-provider anthropic`), ainsi que dans l'UI.
+- Contraintes d'Opus 5.5 respectées : ni `temperature` ni `seed`,
+  `tool_choice` automatique, blocs de raisonnement renvoyés tels quels,
+  refus (`stop_reason = refusal`) converti en réponse `error`.
+- Repli serveur `fallbacks: "default"` activé (modèle réellement utilisé
+  enregistré dans `model`).
+
+#### Vérifications
+
+- Suite complète : 215 tests réussis (20 nouveaux : `tests/test_rag.py`,
+  `tests/test_anthropic.py` avec SDK simulé), 2 désélectionnés (intégration).
+- `rag` réel via OpenRouter (`openai/gpt-4.1-mini`) : DALO cité F18005,
+  4,6 s, 0,0014 $ ; disponibilité temps réel à Lyon : abstention sans citation.
+- `rag` réel via Ollama (`qwen3:4b-instruct`, MacBook Air M2 8 Go) : DALO
+  cité F18005, 63 s chargement du modèle compris.
+- Anthropic non testé en réel : `ANTHROPIC_API_KEY` absente du `.env`.
+  Test d'intégration prêt : `uv run pytest -m integration tests/test_anthropic.py`.
+
+#### Reste à faire
+
+- Renseigner `ANTHROPIC_API_KEY`, lancer le test d'intégration puis un run
+  `agent_tools --provider anthropic` pour compléter la comparaison local vs API.
+- Fermer la PR #2, désormais intégrée.
+
+### 21 octobre 2026 — Validation d'intégration sans notebook
+
+- Branche d'essai `test-alexis-sans-notebook` : retrait de `notebooks/Assistant_HLM_RAG.ipynb` validé par Alexis.
+- Suite Python `uv run pytest -q` : **215 tests réussis, 2 désélectionnés** après retrait du notebook.
+- Suite MCP `uv run pytest -q tests/test_mcp_server.py` : **9 tests réussis**.
+- Retrieval hybride vérifié par la question DALO : document **F18005** retrouvé au premier rang.
+- RAG local `--backend rag --provider ollama` : réponse sur le DALO avec citation Service-Public F18005.
+- Streamlit testé en réel avec le RAG, puis avec `agent_tools --provider ollama` : appels fonctionnels à `check_eligibility` et `social_housing_stats`.
+- Les corrections RAG d'Alexis et la suppression du notebook ne nécessitent aucun fichier `.ipynb` pour les chemins d'exécution testés.
+- Anthropic : tests avec SDK simulé couverts par la suite automatique ; appels réels non validés faute de `ANTHROPIC_API_KEY` dans le `.env` local.
+- Le tag historique `v1.0` reste inchangé. Les contrôles automatisés et démonstrations réalisés ne prouvent pas l'exécution exhaustive de tous les scénarios en production.
+

@@ -108,7 +108,7 @@ class ToolsSettings(_Section):
 # AGENT
 # ============================================================
 
-Backend = Literal["openrouter", "ollama"]
+Backend = Literal["openrouter", "ollama", "anthropic"]
 
 
 class BackendSettings(_Section):
@@ -117,6 +117,10 @@ class BackendSettings(_Section):
     base_url: str | None = None
     tool_choice: Literal["required", "auto"] | None = None
     app_name: str | None = None
+    # Anthropic uniquement : effort explicite (Opus 5.5 : thinking toujours actif,
+    # effort par défaut `medium`) et plafond de tokens générés.
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+    max_tokens: int | None = None
 
 
 class Price(_Section):
@@ -166,6 +170,10 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(
         default=None,
         validation_alias="OPENROUTER_API_KEY",
+    )
+    anthropic_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="ANTHROPIC_API_KEY",
     )
 
     @classmethod

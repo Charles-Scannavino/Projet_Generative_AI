@@ -20,7 +20,7 @@ from typing import Annotated, Any
 from pydantic import Field, StringConstraints, ValidationError
 
 from src.agent.guards import detect_injection, ungrounded_numbers
-from src.agent.llm import LLM_ERRORS, LLMClient, LLMTurn, build_client
+from src.agent.llm import LLM_ERRORS, NATIVE_KEY, LLMClient, LLMTurn, build_client
 from src.agent.prompts import prompt_version, system_prompt
 from src.agent.rag import passages_from
 from src.agent.retrieval import RetrieverName, get_search
@@ -52,7 +52,8 @@ FINAL_ANSWER_JSON_SCHEMA: dict[str, Any] = {
         "cited_document_ids": {"type": "array", "items": {"type": "string"}},
         "abstained": {"type": "boolean"},
         "needs_clarification": {"type": "boolean"},
-        "abstention_reason": {"type": ["string", "null"]},
+        # Chaîne simple (vide si sans objet) : accepté tel quel par les trois fournisseurs.
+        "abstention_reason": {"type": "string"},
     },
     "required": [
         "answer",
@@ -130,6 +131,8 @@ def _assistant_message(turn: LLMTurn) -> dict[str, Any]:
             }
             for call in turn.tool_calls
         ]
+    if turn.native is not None:
+        message[NATIVE_KEY] = turn.native
     return message
 
 
@@ -200,7 +203,7 @@ def _dropped_argument_warnings(traces: list[ToolCallTrace]) -> list[str]:
 def _structure_free_text(
     client: LLMClient,
     messages: list[dict[str, Any]],
-    content: str,
+    free_turn: LLMTurn,
 ) -> tuple[FinalAnswer, LLMTurn | None]:
     """Réponse en texte libre -> FinalAnswer, par sortie JSON contrainte si possible.
 
@@ -208,14 +211,14 @@ def _structure_free_text(
     final_answer (mesuré le 18/10 avec qwen3:4b-instruct) : citations et indicateurs
     d'abstention seraient perdus. Repli : le texte brut, sans citation.
     """
-    fallback = FinalAnswer(answer=content.strip()[:4000])
+    fallback = FinalAnswer(answer=(free_turn.content or "").strip()[:4000])
     complete_json = getattr(client, "complete_json", None)
     if complete_json is None:
         return fallback, None
 
     followup = [
         *messages,
-        {"role": "assistant", "content": content},
+        _assistant_message(free_turn),
         {"role": "user", "content": STRUCTURE_INSTRUCTION},
     ]
     try:
@@ -291,7 +294,7 @@ def run_tool_agent(
 
         if not turn.tool_calls:
             if turn.content and turn.content.strip():
-                final, structured = _structure_free_text(client, messages, turn.content)
+                final, structured = _structure_free_text(client, messages, turn)
                 if structured is not None:
                     llm_calls += 1
                     tokens_in += structured.tokens_in
@@ -374,6 +377,7 @@ def run_tool_agent(
                 source=meta.source,
                 title=meta.title,
                 url=meta.url,
+                article=meta.article,
             )
         )
     if dropped:

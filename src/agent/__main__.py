@@ -23,7 +23,7 @@ def main() -> None:
     parser.add_argument(
         "--provider",
         choices=get_args(Provider),
-        help="agent_tools uniquement (défaut : configs/agent.yaml).",
+        help="rag (défaut : ollama) et agent_tools (défaut : configs/agent.yaml).",
     )
     parser.add_argument("--model", help="Remplace le modèle par défaut du backend.")
     parser.add_argument("--retriever", choices=["hybrid", "hybrid_norerank", "bm25"])
@@ -46,7 +46,7 @@ def main() -> None:
         options["model"] = args.model
     if args.retriever:
         options["retriever"] = args.retriever
-    if args.provider and args.backend == "agent_tools":
+    if args.provider and args.backend in ("rag", "agent_tools"):
         options["provider"] = args.provider
 
     if not args.no_warmup and args.retriever != "bm25":

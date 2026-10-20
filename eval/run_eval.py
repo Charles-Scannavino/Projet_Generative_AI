@@ -4,7 +4,7 @@
 
 Options utiles :
     --backend baseline|rag|agent|agent_tools   (défaut : agent)
-    --provider openrouter|ollama   (agent_tools uniquement, défaut : configs/agent.yaml)
+    --provider ollama|openrouter|anthropic   (rag : défaut ollama ; agent_tools : configs/agent.yaml)
     --retriever hybrid|hybrid_norerank|bm25
     --model qwen3:4b-instruct      (tout modèle Ollama)
     --judge                        juge LLM : correct / partiel / incorrect vs réponse de référence
@@ -101,8 +101,8 @@ VERDICT_SCHEMA = {
 }
 
 
-def judge(row: dict, response: AssistantResponse, model: str, provider: str = "ollama") -> dict:
-    """Juge LLM : Ollama (local) ou OpenRouter (API, coût réel enregistré)."""
+def judge(row: dict, response: AssistantResponse, model: str | None, provider: str = "ollama") -> dict:
+    """Juge LLM : Ollama (local), OpenRouter ou Anthropic (API, coût enregistré)."""
     from pydantic import BaseModel
 
     class Verdict(BaseModel):
@@ -114,10 +114,10 @@ def judge(row: dict, response: AssistantResponse, model: str, provider: str = "o
     messages = [{"role": "system", "content": JUDGE_PROMPT},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
     cost_usd = None
-    if provider == "openrouter":
+    if provider in ("openrouter", "anthropic"):
         from src.agent.llm import build_client
 
-        result = build_client("openrouter", model).complete_json(messages, VERDICT_SCHEMA, "verdict")
+        result = build_client(provider, model).complete_json(messages, VERDICT_SCHEMA, "verdict")
         content, tokens_in, tokens_out, cost_usd = result.content, result.tokens_in, result.tokens_out, result.cost_usd
     else:
         from src.agent import ollama
@@ -127,7 +127,7 @@ def judge(row: dict, response: AssistantResponse, model: str, provider: str = "o
     verdict = Verdict.model_validate_json(content)
     return {"judge_verdict": verdict.verdict, "judge_reason": verdict.justification,
             "judge_score": {"correct": 1.0, "partial": 0.5}.get(verdict.verdict, 0.0),
-            "judge_model": model, "judge_tokens_in": tokens_in, "judge_tokens_out": tokens_out,
+            "judge_model": model or getattr(result, "model", None), "judge_tokens_in": tokens_in, "judge_tokens_out": tokens_out,
             "judge_cost_usd": cost_usd}
 
 
@@ -216,15 +216,15 @@ def main() -> None:
     parser.add_argument("--backend", choices=BACKENDS, default="agent")
     parser.add_argument("--retriever", choices=["hybrid", "hybrid_norerank", "bm25"], default=None)
     parser.add_argument("--model", default=None, help="modèle Ollama (défaut : OLLAMA_MODEL ou qwen3:4b-instruct), "
-                        "ou modèle du fournisseur pour agent_tools")
-    parser.add_argument("--provider", choices=["openrouter", "ollama"], default=None,
-                        help="fournisseur du backend agent_tools (défaut : configs/agent.yaml)")
+                        "ou modèle du fournisseur choisi par --provider")
+    parser.add_argument("--provider", choices=["ollama", "openrouter", "anthropic"], default=None,
+                        help="fournisseur des backends rag et agent_tools")
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--split", choices=["dev", "test"])
     parser.add_argument("--limit", type=int)
     parser.add_argument("--judge", action="store_true")
     parser.add_argument("--judge-model", default=None)
-    parser.add_argument("--judge-provider", choices=["ollama", "openrouter"], default="ollama",
+    parser.add_argument("--judge-provider", choices=["ollama", "openrouter", "anthropic"], default="ollama",
                         help="fournisseur du juge ; avec openrouter, --judge-model est obligatoire")
     parser.add_argument("--run-name")
     parser.add_argument("--resume", action="store_true")
@@ -248,7 +248,7 @@ def main() -> None:
         options["retriever"] = args.retriever
     if args.model and args.backend != "baseline":
         options["model"] = args.model
-    if args.provider and args.backend == "agent_tools":
+    if args.provider and args.backend in ("rag", "agent_tools"):
         options["provider"] = args.provider
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -294,7 +294,9 @@ def main() -> None:
             }
             if args.judge and row["answer"]:
                 try:
-                    judge_model = args.judge_model or options.get("model") or _ollama.DEFAULT_MODEL
+                    judge_model = args.judge_model or (
+                        None if args.judge_provider == "anthropic"  # défaut : configs/agent.yaml (Opus 5.5)
+                        else options.get("model") or _ollama.DEFAULT_MODEL)
                     record["metrics"].update(judge(row, response, judge_model, args.judge_provider))
                 except Exception as error:
                     record["judge_error"] = str(error)
